@@ -2,10 +2,13 @@ import { decodeJwt, errors as joseErrors, type JWTPayload } from "jose";
 
 import { AuthClaimsSchema, type AuthClaims } from "./schema.js";
 
-const CHATGPT_ACCOUNT_ID_CLAIM =
+const LEGACY_CHATGPT_ACCOUNT_ID_CLAIM =
   "https://api.openai.com/auth.chatgpt_account_id";
-const CHATGPT_PLAN_TYPE_CLAIM = "https://api.openai.com/auth.chatgpt_plan_type";
-const ORGANIZATIONS_CLAIM = "https://api.openai.com/auth.organizations";
+const LEGACY_CHATGPT_PLAN_TYPE_CLAIM =
+  "https://api.openai.com/auth.chatgpt_plan_type";
+const LEGACY_ORGANIZATIONS_CLAIM = "https://api.openai.com/auth.organizations";
+const AUTH_CLAIM = "https://api.openai.com/auth";
+const PROFILE_CLAIM = "https://api.openai.com/profile";
 
 function getStringClaim(
   payload: JWTPayload,
@@ -21,6 +24,17 @@ function getNumberClaim(
 ): number | undefined {
   const value = payload[claimName];
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function getObjectClaim(
+  payload: JWTPayload,
+  claimName: string,
+): Record<string, unknown> | undefined {
+  const value = payload[claimName];
+
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 export function decodeJwtPayload(token: string): JWTPayload {
@@ -39,10 +53,13 @@ export function extractAuthClaims(
   idTokenPayload: JWTPayload,
   accessTokenPayload: JWTPayload,
 ): AuthClaims {
-  const chatgptAccountId = getStringClaim(
-    idTokenPayload,
-    CHATGPT_ACCOUNT_ID_CLAIM,
-  );
+  const idTokenAuth = getObjectClaim(idTokenPayload, AUTH_CLAIM);
+  const accessTokenAuth = getObjectClaim(accessTokenPayload, AUTH_CLAIM);
+  const accessTokenProfile = getObjectClaim(accessTokenPayload, PROFILE_CLAIM);
+  const chatgptAccountId =
+    getNestedStringClaim(idTokenAuth, "chatgpt_account_id") ??
+    getNestedStringClaim(accessTokenAuth, "chatgpt_account_id") ??
+    getStringClaim(idTokenPayload, LEGACY_CHATGPT_ACCOUNT_ID_CLAIM);
   const expiresAt = accessTokenPayload.exp ?? getNumberClaim(idTokenPayload, "exp");
 
   if (!chatgptAccountId) {
@@ -54,13 +71,26 @@ export function extractAuthClaims(
   }
 
   return AuthClaimsSchema.parse({
-    email: getStringClaim(idTokenPayload, "email"),
+    email:
+      getStringClaim(idTokenPayload, "email") ??
+      getNestedStringClaim(accessTokenProfile, "email"),
     name: getStringClaim(idTokenPayload, "name"),
     sub: getStringClaim(idTokenPayload, "sub"),
-    plan_type: getStringClaim(idTokenPayload, CHATGPT_PLAN_TYPE_CLAIM),
+    plan_type:
+      getNestedStringClaim(idTokenAuth, "chatgpt_plan_type") ??
+      getNestedStringClaim(accessTokenAuth, "chatgpt_plan_type") ??
+      getStringClaim(idTokenPayload, LEGACY_CHATGPT_PLAN_TYPE_CLAIM),
     chatgpt_account_id: chatgptAccountId,
     expires_at: expiresAt,
-    organizations: idTokenPayload[ORGANIZATIONS_CLAIM],
+    organizations:
+      idTokenAuth?.organizations ?? idTokenPayload[LEGACY_ORGANIZATIONS_CLAIM],
   });
 }
 
+function getNestedStringClaim(
+  value: Record<string, unknown> | undefined,
+  claimName: string,
+): string | undefined {
+  const claim = value?.[claimName];
+  return typeof claim === "string" && claim.length > 0 ? claim : undefined;
+}
