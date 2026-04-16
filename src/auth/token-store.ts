@@ -1,5 +1,5 @@
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { z } from "zod";
+import { ZodError, z } from "zod";
 
 import type { AppConfig } from "../config.js";
 import { decodeJwtPayload, extractAuthClaims } from "./claims.js";
@@ -30,10 +30,18 @@ export async function loadStoredAuthWithSource(
   ]) {
     try {
       const contents = await readFile(candidatePath, "utf8");
-      return {
-        storedAuth: parseStoredAuthContents(contents),
-        sourcePath: candidatePath,
-      };
+      try {
+        return {
+          storedAuth: parseStoredAuthContents(contents),
+          sourcePath: candidatePath,
+        };
+      } catch (error) {
+        if (isInvalidAuthContentsError(error)) {
+          continue;
+        }
+
+        throw error;
+      }
     } catch (error) {
       if (isMissingFileError(error)) {
         continue;
@@ -96,6 +104,10 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     "code" in error &&
     error.code === "ENOENT"
   );
+}
+
+function isInvalidAuthContentsError(error: unknown): boolean {
+  return error instanceof SyntaxError || error instanceof ZodError;
 }
 
 function parseStoredAuthContents(contents: string): StoredAuth {
