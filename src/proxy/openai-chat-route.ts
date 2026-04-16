@@ -3,7 +3,10 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { AuthRequiredError } from "../auth/errors.js";
 import { OpenAIChatCompletionRequestSchema } from "../types/openai.js";
 import { translateChatToCodex } from "./translate-chat-to-codex.js";
-import { createCodexSseToOpenAiTranslator } from "./translate-codex-sse-to-openai.js";
+import {
+  collectCodexSseToOpenAiCompletion,
+  createCodexSseToOpenAiTranslator,
+} from "./translate-codex-sse-to-openai.js";
 import { sendCodexResponsesRequest } from "./upstream.js";
 
 export async function registerOpenAiChatRoute(app: FastifyInstance): Promise<void> {
@@ -17,14 +20,6 @@ export async function registerOpenAiChatRoute(app: FastifyInstance): Promise<voi
         reply,
         400,
         error instanceof Error ? error.message : "Invalid request body",
-      );
-    }
-
-    if (parsedRequest.stream === false) {
-      return sendOpenAiError(
-        reply,
-        400,
-        "This prototype only supports stream=true for /v1/chat/completions.",
       );
     }
 
@@ -53,6 +48,15 @@ export async function registerOpenAiChatRoute(app: FastifyInstance): Promise<voi
 
       if (!upstreamResponse.body) {
         return sendOpenAiError(reply, 502, "Upstream response body was empty.");
+      }
+
+      if (parsedRequest.stream === false) {
+        const completion = await collectCodexSseToOpenAiCompletion({
+          upstreamResponse,
+          model: parsedRequest.model,
+        });
+
+        return reply.status(200).send(completion);
       }
 
       await pipeCodexSseToOpenAi({

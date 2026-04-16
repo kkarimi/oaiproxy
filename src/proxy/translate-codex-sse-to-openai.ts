@@ -6,6 +6,20 @@ type TranslationState = {
   assistantRoleSent: boolean;
 };
 
+type CompletionCollectionState = {
+  id: string;
+  created: number;
+  contentParts: string[];
+  finishReason: "stop" | null;
+  usage:
+    | {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+      }
+    | undefined;
+};
+
 export function createCodexSseToOpenAiTranslator(model: string) {
   const state: TranslationState = {
     id: `chatcmpl_${randomUUID()}`,
@@ -106,6 +120,74 @@ export function createCodexSseToOpenAiTranslator(model: string) {
   };
 }
 
+export async function collectCodexSseToOpenAiCompletion(input: {
+  upstreamResponse: Response;
+  model: string;
+}): Promise<Record<string, unknown>> {
+  const reader = input.upstreamResponse.body?.getReader();
+
+  if (!reader) {
+    throw new Error("Upstream response body reader was not available");
+  }
+
+  const state: CompletionCollectionState = {
+    id: `chatcmpl_${randomUUID()}`,
+    created: Math.floor(Date.now() / 1000),
+    contentParts: [],
+    finishReason: null,
+    usage: undefined,
+  };
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true }).replaceAll("\r\n", "\n");
+
+    while (true) {
+      const delimiterIndex = buffer.indexOf("\n\n");
+
+      if (delimiterIndex === -1) {
+        break;
+      }
+
+      const eventBlock = buffer.slice(0, delimiterIndex);
+      buffer = buffer.slice(delimiterIndex + 2);
+      collectEventBlock(state, eventBlock);
+    }
+  }
+
+  buffer += decoder.decode();
+
+  if (buffer.trim().length > 0) {
+    collectEventBlock(state, buffer);
+  }
+
+  return {
+    id: state.id,
+    object: "chat.completion",
+    created: state.created,
+    model: input.model,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: state.contentParts.join(""),
+        },
+        finish_reason: state.finishReason ?? "stop",
+      },
+    ],
+    ...(state.usage ? { usage: state.usage } : {}),
+  };
+}
+
 function formatOpenAiChunk(input: {
   id: string;
   created: number;
@@ -172,10 +254,84 @@ function tryParseJson(value: string): unknown {
   }
 }
 
+function collectEventBlock(
+  state: CompletionCollectionState,
+  eventBlock: string,
+): void {
+  const parsedEvent = parseSseEventBlock(eventBlock);
+
+  if (!parsedEvent) {
+    return;
+  }
+
+  const payload = tryParseJson(parsedEvent.data);
+
+  if (!payload || typeof payload !== "object") {
+    return;
+  }
+
+  const payloadRecord = payload as Record<string, unknown>;
+  const eventType =
+    (typeof payloadRecord.type === "string" && payloadRecord.type) ||
+    parsedEvent.event;
+
+  if (eventType === "response.created") {
+    const response = getObjectValue(payloadRecord, "response");
+    const responseId = getStringValue(response, "id");
+    const createdAt = getNumberValue(response, "created_at");
+
+    if (responseId) {
+      state.id = responseId;
+    }
+
+    if (createdAt) {
+      state.created = createdAt;
+    }
+
+    return;
+  }
+
+  if (eventType === "response.output_text.delta") {
+    const delta = getStringValue(payloadRecord, "delta");
+
+    if (delta) {
+      state.contentParts.push(delta);
+    }
+
+    return;
+  }
+
+  if (eventType === "response.completed") {
+    const response = getObjectValue(payloadRecord, "response");
+    const usage = getObjectValue(response, "usage");
+    const inputTokens = getNumberValue(usage, "input_tokens");
+    const outputTokens = getNumberValue(usage, "output_tokens");
+    const totalTokens = getNumberValue(usage, "total_tokens");
+
+    state.finishReason = "stop";
+
+    if (
+      typeof inputTokens === "number" &&
+      typeof outputTokens === "number" &&
+      typeof totalTokens === "number"
+    ) {
+      state.usage = {
+        prompt_tokens: inputTokens,
+        completion_tokens: outputTokens,
+        total_tokens: totalTokens,
+      };
+    }
+  }
+}
+
 function getObjectValue(
-  value: object,
+  value: object | null,
   key: string,
 ): Record<string, unknown> | null {
+  if (!value) {
+    return null;
+  }
+
   const nestedValue = (value as Record<string, unknown>)[key];
 
   return typeof nestedValue === "object" &&
