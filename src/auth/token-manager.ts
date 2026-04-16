@@ -1,3 +1,4 @@
+import { AuthRequiredError } from "./errors.js";
 import { type StoredAuth } from "./schema.js";
 import { refreshOAuthTokens } from "./oauth.js";
 import { loadStoredAuth } from "./token-store.js";
@@ -65,4 +66,16 @@ export function isStoredAuthExpired(
   now = new Date(),
 ): boolean {
   return storedAuth.claims.expires_at * 1000 <= now.getTime();
+}
+
+export async function requireStoredAuthWithRefresh(
+  now = new Date(),
+): Promise<StoredAuth> {
+  const result = await getStoredAuthWithRefresh(now);
+
+  if (!result.storedAuth) {
+    throw new AuthRequiredError();
+  }
+
+  return result.storedAuth;
 }
