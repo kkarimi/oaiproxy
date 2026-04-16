@@ -119,13 +119,16 @@ async function start() {
   const config = loadConfig();
   const app = await buildServer(config);
   const startupLogger = app.log.child({ component: "startup" });
+  installSignalHandlers(app);
 
   try {
     await app.listen({
       host: config.server.host,
       port: config.server.port,
     });
-    await maybePromptForLoginOnStartup(config, startupLogger);
+    if (config.auth.startupLoginPrompt) {
+      await maybePromptForLoginOnStartup(config, startupLogger);
+    }
   } catch (error) {
     app.log.error(error);
     process.exit(1);
@@ -180,4 +183,30 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function installSignalHandlers(app: Awaited<ReturnType<typeof buildServer>>) {
+  let shuttingDown = false;
+
+  const handleSignal = (signal: NodeJS.Signals) => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+
+    void (async () => {
+      try {
+        app.log.info({ signal }, "Shutting down server");
+        await app.close();
+        process.exit(0);
+      } catch (error) {
+        app.log.error(error, "Failed to shut down cleanly");
+        process.exit(1);
+      }
+    })();
+  };
+
+  process.on("SIGINT", handleSignal);
+  process.on("SIGTERM", handleSignal);
 }

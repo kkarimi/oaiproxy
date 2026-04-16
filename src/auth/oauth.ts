@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getConfig } from "../config.js";
+import { fetchWithTimeout } from "../http.js";
 import { decodeJwtPayload, extractAuthClaims } from "./claims.js";
 import { openBrowser } from "./browser.js";
 import { createPkceChallenge } from "./pkce.js";
@@ -191,13 +192,20 @@ async function exchangeTokenGrant(
   body: URLSearchParams,
 ): Promise<OAuthTokenResponse> {
   const config = getConfig();
-  const response = await fetch(config.auth.tokenUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded",
+  const response = await fetchWithTimeout(
+    config.auth.tokenUrl,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body,
     },
-    body,
-  });
+    {
+      timeoutMs: config.proxy.upstreamTimeoutMs,
+      context: "OAuth token exchange",
+    },
+  );
 
   if (!response.ok) {
     const errorBody = await response.text();
