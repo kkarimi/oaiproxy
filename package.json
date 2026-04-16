@@ -1,0 +1,24 @@
+{
+  "name": "oaiproxy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local ChatGPT subscription proxy exposing an OpenAI-compatible API.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "scripts": {
+    "start": "node --import tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fastify": "^5.2.1",
+    "jose": "^6.0.11",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
