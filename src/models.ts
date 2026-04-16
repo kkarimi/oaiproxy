@@ -1,7 +1,7 @@
-export const SUPPORTED_MODEL_IDS = ["gpt-5.4"] as const;
+import { getConfig } from "./config.js";
 
 export function listSupportedModels() {
-  return SUPPORTED_MODEL_IDS.map((id) => ({
+  return getConfig().proxy.supportedModels.map((id) => ({
     id,
     object: "model",
     created: 0,

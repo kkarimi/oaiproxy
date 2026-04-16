@@ -1,5 +1,6 @@
+import { getConfig } from "../config.js";
 import { type StoredAuth } from "./schema.js";
-import { AUTH_FILE_PATH, loadStoredAuthWithSource } from "./token-store.js";
+import { loadStoredAuthWithSource } from "./token-store.js";
 
 export type AuthStatus = {
   authenticated: boolean;
@@ -19,7 +20,7 @@ export async function getAuthStatus(now = new Date()): Promise<AuthStatus> {
     return {
       authenticated: false,
       reason: "missing",
-      auth_path: AUTH_FILE_PATH,
+      auth_path: getConfig().auth.filePath,
       email: null,
       plan_type: null,
       account_id: null,

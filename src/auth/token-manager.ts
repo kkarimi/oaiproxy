@@ -1,9 +1,8 @@
 import { AuthRequiredError } from "./errors.js";
+import { getConfig } from "../config.js";
 import { type StoredAuth } from "./schema.js";
 import { refreshOAuthTokens } from "./oauth.js";
 import { loadStoredAuth } from "./token-store.js";
-
-const REFRESH_WINDOW_MS = 5 * 60 * 1000;
 
 export async function getStoredAuthWithRefresh(
   now = new Date(),
@@ -60,7 +59,7 @@ export function shouldRefreshStoredAuth(
   now = new Date(),
 ): boolean {
   const expiresAtMs = storedAuth.claims.expires_at * 1000;
-  return expiresAtMs - now.getTime() <= REFRESH_WINDOW_MS;
+  return expiresAtMs - now.getTime() <= getConfig().proxy.refreshWindowMs;
 }
 
 export function isStoredAuthExpired(

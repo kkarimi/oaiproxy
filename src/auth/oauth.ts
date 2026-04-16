@@ -1,15 +1,11 @@
 import { z } from "zod";
 
+import { getConfig } from "../config.js";
 import { decodeJwtPayload, extractAuthClaims } from "./claims.js";
 import { openBrowser } from "./browser.js";
 import { createPkceChallenge } from "./pkce.js";
 import { saveStoredAuth, type PersistedTokens } from "./token-store.js";
 import { type StoredAuth } from "./schema.js";
-
-const OAUTH_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const OAUTH_SCOPES = "openid profile email offline_access";
-const AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize";
-const TOKEN_URL = "https://auth.openai.com/oauth/token";
 
 const OAuthTokenResponseSchema = z.object({
   id_token: z.string().min(1),
@@ -139,11 +135,12 @@ function buildAuthorizationUrl(input: {
   codeChallenge: string;
   state: string;
 }): string {
-  const url = new URL(AUTHORIZE_URL);
+  const config = getConfig();
+  const url = new URL(config.auth.authorizeUrl);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", OAUTH_CLIENT_ID);
+  url.searchParams.set("client_id", config.auth.oauthClientId);
   url.searchParams.set("redirect_uri", input.redirectUri);
-  url.searchParams.set("scope", OAUTH_SCOPES);
+  url.searchParams.set("scope", config.auth.oauthScopes);
   url.searchParams.set("code_challenge", input.codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("state", input.state);
@@ -158,10 +155,11 @@ async function exchangeAuthorizationCode(input: {
   codeVerifier: string;
   redirectUri: string;
 }): Promise<OAuthTokenResponse> {
+  const config = getConfig();
   return exchangeTokenGrant(
     new URLSearchParams({
       grant_type: "authorization_code",
-      client_id: OAUTH_CLIENT_ID,
+      client_id: config.auth.oauthClientId,
       code: input.code,
       redirect_uri: input.redirectUri,
       code_verifier: input.codeVerifier,
@@ -172,12 +170,13 @@ async function exchangeAuthorizationCode(input: {
 export async function refreshOAuthTokens(
   refreshToken: string,
 ): Promise<StoredAuth> {
+  const config = getConfig();
   const tokenResponse = await exchangeTokenGrant(
     new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: refreshToken,
-      client_id: OAUTH_CLIENT_ID,
-      scope: OAUTH_SCOPES,
+      client_id: config.auth.oauthClientId,
+      scope: config.auth.oauthScopes,
     }),
   );
 
@@ -191,7 +190,8 @@ export async function refreshOAuthTokens(
 async function exchangeTokenGrant(
   body: URLSearchParams,
 ): Promise<OAuthTokenResponse> {
-  const response = await fetch(TOKEN_URL, {
+  const config = getConfig();
+  const response = await fetch(config.auth.tokenUrl, {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",

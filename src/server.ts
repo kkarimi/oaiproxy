@@ -4,7 +4,11 @@ import { beginOAuthLogin, completeOAuthLogin } from "./auth/oauth.js";
 import { maybePromptForLoginOnStartup } from "./auth/startup.js";
 import { getAuthStatus } from "./auth/status.js";
 import { clearStoredAuth } from "./auth/token-store.js";
-import { loadConfig, type AppConfig } from "./config.js";
+import {
+  buildOAuthRedirectUri,
+  loadConfig,
+  type AppConfig,
+} from "./config.js";
 import { listSupportedModels } from "./models.js";
 import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
@@ -40,7 +44,7 @@ async function buildServer(config: AppConfig) {
 
   app.post("/auth/login", async (_, reply) => {
     const login = await beginOAuthLogin({
-      redirectUri: buildOAuthRedirectUri(config.PORT),
+      redirectUri: buildOAuthRedirectUri(config),
       openBrowserWindow: true,
     });
 
@@ -115,10 +119,10 @@ async function start() {
 
   try {
     await app.listen({
-      host: config.HOST,
-      port: config.PORT,
+      host: config.server.host,
+      port: config.server.port,
     });
-    await maybePromptForLoginOnStartup(config.PORT);
+    await maybePromptForLoginOnStartup(config.server.port);
   } catch (error) {
     app.log.error(error);
     process.exit(1);
@@ -126,10 +130,6 @@ async function start() {
 }
 
 void start();
-
-function buildOAuthRedirectUri(port: number): string {
-  return `http://localhost:${port}/auth/callback`;
-}
 
 function renderCallbackPage(input: { title: string; body: string }): string {
   return `<!doctype html>

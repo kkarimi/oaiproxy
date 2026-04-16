@@ -1,17 +1,9 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { z } from "zod";
 
+import { getConfig } from "../config.js";
 import { decodeJwtPayload, extractAuthClaims } from "./claims.js";
 import { type AuthClaims, StoredAuthSchema, type StoredAuth } from "./schema.js";
-
-export const AUTH_DIRECTORY_PATH = path.join(os.homedir(), ".chatgpt-codex");
-export const AUTH_FILE_PATH = path.join(AUTH_DIRECTORY_PATH, "auth.json");
-export const CODEX_AUTH_FALLBACK_PATHS = [
-  process.env.CODEX_HOME ? path.join(process.env.CODEX_HOME, "auth.json") : null,
-  path.join(os.homedir(), ".codex", "auth.json"),
-].filter((candidate): candidate is string => Boolean(candidate));
 
 export type PersistedTokens = {
   idToken: string;
@@ -28,7 +20,12 @@ export async function loadStoredAuthWithSource(): Promise<{
   storedAuth: StoredAuth;
   sourcePath: string;
 } | null> {
-  for (const candidatePath of [AUTH_FILE_PATH, ...CODEX_AUTH_FALLBACK_PATHS]) {
+  const config = getConfig();
+
+  for (const candidatePath of [
+    config.auth.filePath,
+    ...config.auth.codexFallbackPaths,
+  ]) {
     try {
       const contents = await readFile(candidatePath, "utf8");
       return {
@@ -52,6 +49,7 @@ export async function saveStoredAuth(input: {
   claims: AuthClaims;
   lastRefresh: string | null;
 }): Promise<StoredAuth> {
+  const config = getConfig();
   const record = StoredAuthSchema.parse({
     provider: "openai-chatgpt-subscription",
     version: 1,
@@ -65,18 +63,18 @@ export async function saveStoredAuth(input: {
     last_refresh: input.lastRefresh,
   });
 
-  await mkdir(AUTH_DIRECTORY_PATH, { recursive: true });
-  await writeFile(AUTH_FILE_PATH, `${JSON.stringify(record, null, 2)}\n`, {
+  await mkdir(config.auth.directoryPath, { recursive: true });
+  await writeFile(config.auth.filePath, `${JSON.stringify(record, null, 2)}\n`, {
     encoding: "utf8",
     mode: 0o600,
   });
-  await chmod(AUTH_FILE_PATH, 0o600);
+  await chmod(config.auth.filePath, 0o600);
 
   return record;
 }
 
 export async function clearStoredAuth(): Promise<void> {
-  await rm(AUTH_FILE_PATH, { force: true });
+  await rm(getConfig().auth.filePath, { force: true });
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
