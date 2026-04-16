@@ -1,7 +1,7 @@
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { z } from "zod";
 
-import { getConfig } from "../config.js";
+import type { AppConfig } from "../config.js";
 import { decodeJwtPayload, extractAuthClaims } from "./claims.js";
 import { type AuthClaims, StoredAuthSchema, type StoredAuth } from "./schema.js";
 
@@ -11,17 +11,19 @@ export type PersistedTokens = {
   refreshToken: string;
 };
 
-export async function loadStoredAuth(): Promise<StoredAuth | null> {
-  const loadedAuth = await loadStoredAuthWithSource();
+export async function loadStoredAuth(
+  config: AppConfig,
+): Promise<StoredAuth | null> {
+  const loadedAuth = await loadStoredAuthWithSource(config);
   return loadedAuth?.storedAuth ?? null;
 }
 
-export async function loadStoredAuthWithSource(): Promise<{
+export async function loadStoredAuthWithSource(
+  config: AppConfig,
+): Promise<{
   storedAuth: StoredAuth;
   sourcePath: string;
 } | null> {
-  const config = getConfig();
-
   for (const candidatePath of [
     config.auth.filePath,
     ...config.auth.codexFallbackPaths,
@@ -44,12 +46,14 @@ export async function loadStoredAuthWithSource(): Promise<{
   return null;
 }
 
-export async function saveStoredAuth(input: {
-  tokens: PersistedTokens;
-  claims: AuthClaims;
-  lastRefresh: string | null;
-}): Promise<StoredAuth> {
-  const config = getConfig();
+export async function saveStoredAuth(
+  config: AppConfig,
+  input: {
+    tokens: PersistedTokens;
+    claims: AuthClaims;
+    lastRefresh: string | null;
+  },
+): Promise<StoredAuth> {
   const tempFilePath = `${config.auth.filePath}.${process.pid}.${Date.now()}.tmp`;
   const record = StoredAuthSchema.parse({
     provider: "openai-chatgpt-subscription",
@@ -81,8 +85,8 @@ export async function saveStoredAuth(input: {
   return record;
 }
 
-export async function clearStoredAuth(): Promise<void> {
-  await rm(getConfig().auth.filePath, { force: true });
+export async function clearStoredAuth(config: AppConfig): Promise<void> {
+  await rm(config.auth.filePath, { force: true });
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

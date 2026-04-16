@@ -42,8 +42,6 @@ export type AppConfig = {
   };
 };
 
-let cachedConfig: AppConfig | null = null;
-
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsedEnv = EnvSchema.parse(env);
   const authDirectoryPath = path.join(os.homedir(), ".chatgpt-codex");
@@ -80,11 +78,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       level: parsedEnv.LOG_LEVEL,
     },
   };
-}
-
-export function getConfig(): AppConfig {
-  cachedConfig ??= loadConfig();
-  return cachedConfig;
 }
 
 export function buildOAuthRedirectUri(config: AppConfig): string {

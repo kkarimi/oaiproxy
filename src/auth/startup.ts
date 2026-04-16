@@ -1,8 +1,7 @@
 import readline from "node:readline/promises";
 
-import { beginOAuthLogin } from "./oauth.js";
+import type { AuthService } from "./service.js";
 import { buildOAuthRedirectUri, type AppConfig } from "../config.js";
-import { getAuthStatus } from "./status.js";
 
 type StartupLogger = {
   info: (message: string) => void;
@@ -11,9 +10,10 @@ type StartupLogger = {
 
 export async function maybePromptForLoginOnStartup(
   config: AppConfig,
+  authService: AuthService,
   logger: StartupLogger,
 ): Promise<void> {
-  const status = await getAuthStatus();
+  const status = await authService.getStatus();
 
   if (status.authenticated) {
     logger.info(
@@ -47,7 +47,7 @@ export async function maybePromptForLoginOnStartup(
       return;
     }
 
-    const login = await beginOAuthLogin({
+    const login = await authService.beginLogin({
       redirectUri: buildOAuthRedirectUri(config),
       openBrowserWindow: true,
     });

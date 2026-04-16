@@ -29,6 +29,7 @@ test("shouldRefreshStoredAuth flips true inside the 5 minute window", () => {
   assert.equal(
     shouldRefreshStoredAuth(
       BASE_AUTH,
+      5 * 60 * 1000,
       new Date(BASE_AUTH.claims.expires_at * 1000 - 4 * 60 * 1000),
     ),
     true,
@@ -37,6 +38,7 @@ test("shouldRefreshStoredAuth flips true inside the 5 minute window", () => {
   assert.equal(
     shouldRefreshStoredAuth(
       BASE_AUTH,
+      5 * 60 * 1000,
       new Date(BASE_AUTH.claims.expires_at * 1000 - 10 * 60 * 1000),
     ),
     false,

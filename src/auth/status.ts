@@ -1,6 +1,4 @@
-import { getConfig } from "../config.js";
 import { type StoredAuth } from "./schema.js";
-import { loadStoredAuthWithSource } from "./token-store.js";
 
 export type AuthStatus = {
   authenticated: boolean;
@@ -13,23 +11,24 @@ export type AuthStatus = {
   expires_at_unix: number | null;
 };
 
-export async function getAuthStatus(now = new Date()): Promise<AuthStatus> {
-  const loadedAuth = await loadStoredAuthWithSource();
+export function buildMissingAuthStatus(authPath: string): AuthStatus {
+  return {
+    authenticated: false,
+    reason: "missing",
+    auth_path: authPath,
+    email: null,
+    plan_type: null,
+    account_id: null,
+    expires_at: null,
+    expires_at_unix: null,
+  };
+}
 
-  if (!loadedAuth) {
-    return {
-      authenticated: false,
-      reason: "missing",
-      auth_path: getConfig().auth.filePath,
-      email: null,
-      plan_type: null,
-      account_id: null,
-      expires_at: null,
-      expires_at_unix: null,
-    };
-  }
-
-  const { storedAuth, sourcePath } = loadedAuth;
+export function buildAuthStatus(
+  storedAuth: StoredAuth,
+  sourcePath: string,
+  now = new Date(),
+): AuthStatus {
   const expiresAt = new Date(storedAuth.claims.expires_at * 1000);
   const authenticated = isStoredAuthUsable(storedAuth, now);
 

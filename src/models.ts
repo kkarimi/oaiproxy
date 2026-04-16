@@ -1,7 +1,7 @@
-import { getConfig } from "./config.js";
+import type { AppConfig } from "./config.js";
 
-export function listSupportedModels() {
-  return getConfig().proxy.supportedModels.map((id) => ({
+export function listSupportedModels(config: AppConfig) {
+  return config.proxy.supportedModels.map((id) => ({
     id,
     object: "model",
     created: 0,

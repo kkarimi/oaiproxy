@@ -1,10 +1,8 @@
 import Fastify from "fastify";
 import { pathToFileURL } from "node:url";
 
-import { beginOAuthLogin, completeOAuthLogin } from "./auth/oauth.js";
+import { createAppServices, type AppServices } from "./app-services.js";
 import { maybePromptForLoginOnStartup } from "./auth/startup.js";
-import { getAuthStatus } from "./auth/status.js";
-import { clearStoredAuth } from "./auth/token-store.js";
 import {
   buildOAuthRedirectUri,
   loadConfig,
@@ -14,7 +12,10 @@ import { createLogger } from "./logger.js";
 import { listSupportedModels } from "./models.js";
 import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
-export async function buildServer(config: AppConfig) {
+export async function buildServer(
+  config: AppConfig,
+  services: AppServices = createAppServices(config),
+) {
   const logger = createLogger(config);
   const app = Fastify({
     loggerInstance: logger,
@@ -29,16 +30,16 @@ export async function buildServer(config: AppConfig) {
   app.get("/v1/models", async () => {
     return {
       object: "list",
-      data: listSupportedModels(),
+      data: listSupportedModels(config),
     };
   });
 
   app.get("/auth/status", async () => {
-    return getAuthStatus();
+    return services.auth.getStatus();
   });
 
   app.post("/auth/logout", async (_, reply) => {
-    await clearStoredAuth();
+    await services.auth.clearStoredAuth();
 
     return reply.status(200).send({
       ok: true,
@@ -46,7 +47,7 @@ export async function buildServer(config: AppConfig) {
   });
 
   app.post("/auth/login", async (_, reply) => {
-    const login = await beginOAuthLogin({
+    const login = await services.auth.beginLogin({
       redirectUri: buildOAuthRedirectUri(config),
       openBrowserWindow: true,
     });
@@ -85,7 +86,7 @@ export async function buildServer(config: AppConfig) {
     }
 
     try {
-      const storedAuth = await completeOAuthLogin({
+      const storedAuth = await services.auth.completeLogin({
         code: query.code,
         state: query.state,
       });
@@ -111,14 +112,15 @@ export async function buildServer(config: AppConfig) {
     }
   });
 
-  await registerOpenAiChatRoute(app);
+  await registerOpenAiChatRoute(app, config, services);
 
   return app;
 }
 
 export async function startServer() {
   const config = loadConfig();
-  const app = await buildServer(config);
+  const services = createAppServices(config);
+  const app = await buildServer(config, services);
   const startupLogger = app.log.child({ component: "startup" });
   installSignalHandlers(app);
 
@@ -128,7 +130,7 @@ export async function startServer() {
       port: config.server.port,
     });
     if (config.auth.startupLoginPrompt) {
-      await maybePromptForLoginOnStartup(config, startupLogger);
+      await maybePromptForLoginOnStartup(config, services.auth, startupLogger);
     }
   } catch (error) {
     app.log.error(error);

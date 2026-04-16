@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import { requireStoredAuthWithRefresh } from "../auth/token-manager.js";
+import type { AuthService } from "../auth/service.js";
 
-export async function buildCodexUpstreamHeaders(): Promise<Record<string, string>> {
-  const storedAuth = await requireStoredAuthWithRefresh();
+export async function buildCodexUpstreamHeaders(
+  authService: AuthService,
+): Promise<Record<string, string>> {
+  const storedAuth = await authService.requireStoredAuthWithRefresh();
 
   return {
     authorization: `Bearer ${storedAuth.tokens.access_token}`,

@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 
+import type { AppServices } from "../app-services.js";
+import type { AppConfig } from "../config.js";
 import { AuthRequiredError } from "../auth/errors.js";
 import { OpenAIChatCompletionRequestSchema } from "../types/openai.js";
 import { translateChatToCodex } from "./translate-chat-to-codex.js";
@@ -11,6 +13,8 @@ import { sendCodexResponsesRequest } from "./upstream.js";
 
 export async function registerOpenAiChatRoute(
   app: FastifyInstance<any, any, any, any>,
+  config: AppConfig,
+  services: AppServices,
 ): Promise<void> {
   app.post("/v1/chat/completions", async (request, reply) => {
     let parsedRequest;
@@ -27,7 +31,11 @@ export async function registerOpenAiChatRoute(
 
     try {
       const upstreamRequest = translateChatToCodex(parsedRequest);
-      const upstreamResponse = await sendCodexResponsesRequest(upstreamRequest);
+      const upstreamResponse = await sendCodexResponsesRequest(
+        config,
+        services.auth,
+        upstreamRequest,
+      );
 
       if (!upstreamResponse.ok) {
         const errorText = await upstreamResponse.text();
