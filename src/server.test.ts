@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { AppServices } from "./app-services.js";
-import { AuthRequiredError } from "./auth/errors.js";
+import { AuthFlowError, AuthRequiredError } from "./auth/errors.js";
+import type { StoredAuth } from "./auth/schema.js";
 import { loadConfig } from "./config.js";
 import { buildServer } from "./server.js";
 
@@ -107,6 +108,131 @@ test("buildServer uses injected auth service for auth status and logout", async 
   assert.equal(logoutCalled, true);
 });
 
+test("auth login route starts browser login through the auth service", async (t) => {
+  let beginLoginInput:
+    | {
+        redirectUri: string;
+        openBrowserWindow?: boolean;
+      }
+    | undefined;
+
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub({
+      async beginLogin(input) {
+        beginLoginInput = input;
+        return {
+          authorizationUrl: "https://example.com/login",
+          completion: new Promise(() => {}),
+        };
+      },
+    }),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+  });
+
+  assert.equal(response.statusCode, 202);
+  assert.deepEqual(response.json(), {
+    ok: true,
+    authorization_url: "https://example.com/login",
+  });
+  assert.deepEqual(beginLoginInput, {
+    redirectUri: "http://localhost:1455/auth/callback",
+    openBrowserWindow: true,
+  });
+});
+
+test("auth callback returns a helpful HTML error page for OAuth redirect errors", async (t) => {
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub(),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/auth/callback?error=access_denied&error_description=bad%20%3Cb%3Edenied%3C%2Fb%3E",
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.match(response.headers["content-type"] ?? "", /text\/html/);
+  assert.match(response.body, /Authentication failed/);
+  assert.match(response.body, /access_denied: bad &lt;b&gt;denied&lt;\/b&gt;/);
+  assert.doesNotMatch(response.body, /<b>denied<\/b>/);
+});
+
+test("auth callback completes login through the auth service", async (t) => {
+  let completeLoginInput:
+    | {
+        code: string;
+        state: string;
+      }
+    | undefined;
+
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub({
+      async completeLogin(input) {
+        completeLoginInput = input;
+        return createStoredAuth();
+      },
+    }),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/auth/callback?code=code_123&state=state_456",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.headers["content-type"] ?? "", /text\/html/);
+  assert.match(response.body, /Authentication complete/);
+  assert.match(response.body, /user@example.com/);
+  assert.deepEqual(completeLoginInput, {
+    code: "code_123",
+    state: "state_456",
+  });
+});
+
+test("auth callback returns 400 for recoverable auth flow errors", async (t) => {
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub({
+      async completeLogin() {
+        throw new AuthFlowError("OAuth state mismatch");
+      },
+    }),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/auth/callback?code=code_123&state=state_456",
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.match(response.headers["content-type"] ?? "", /text\/html/);
+  assert.match(response.body, /Authentication failed/);
+  assert.match(response.body, /OAuth state mismatch/);
+});
+
 test("chat completions returns a validation error for invalid requests", async (t) => {
   const app = await buildServer(
     loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
@@ -202,5 +328,25 @@ function createAuthServiceStub(
       },
       ...overrides,
     },
+  };
+}
+
+function createStoredAuth(): StoredAuth {
+  return {
+    provider: "openai-chatgpt-subscription",
+    version: 1,
+    tokens: {
+      id_token: "id_token",
+      access_token: "access_token",
+      refresh_token: "refresh_token",
+      account_id: "acct_123",
+    },
+    claims: {
+      email: "user@example.com",
+      chatgpt_account_id: "acct_123",
+      plan_type: "pro",
+      expires_at: 1_893_456_000,
+    },
+    last_refresh: "2029-12-31T23:55:00.000Z",
   };
 }

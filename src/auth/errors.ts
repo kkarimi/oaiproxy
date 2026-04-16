@@ -4,3 +4,13 @@ export class AuthRequiredError extends Error {
     this.name = "AuthRequiredError";
   }
 }
+
+export class AuthFlowError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode = 400,
+  ) {
+    super(message);
+    this.name = "AuthFlowError";
+  }
+}

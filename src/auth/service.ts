@@ -4,7 +4,7 @@ import type { AppConfig } from "../config.js";
 import { fetchWithTimeout } from "../http.js";
 import { buildAuthStatus, buildMissingAuthStatus, type AuthStatus } from "./status.js";
 import { decodeJwtPayload, extractAuthClaims } from "./claims.js";
-import { AuthRequiredError } from "./errors.js";
+import { AuthFlowError, AuthRequiredError } from "./errors.js";
 import { openBrowser } from "./browser.js";
 import { createPkceChallenge } from "./pkce.js";
 import { shouldRefreshStoredAuth, isStoredAuthExpired } from "./token-manager.js";
@@ -98,6 +98,9 @@ export class AuthService implements AuthServiceLike {
       resolveLogin = resolve;
       rejectLogin = reject;
     });
+    // The startup prompt awaits this promise, but the HTTP login route does not.
+    // Keep the rejection handled so failed logins do not produce unhandled rejections.
+    void completion.catch(() => {});
 
     this.pendingLogin = {
       state: pkce.state,
@@ -131,11 +134,11 @@ export class AuthService implements AuthServiceLike {
     const currentLogin = this.pendingLogin;
 
     if (!currentLogin) {
-      throw new Error("No OAuth login is currently pending");
+      throw new AuthFlowError("No OAuth login is currently pending");
     }
 
     if (currentLogin.state !== input.state) {
-      throw new Error("OAuth state mismatch");
+      throw new AuthFlowError("OAuth state mismatch");
     }
 
     try {

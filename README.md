@@ -43,6 +43,27 @@ On startup:
 - If auth is missing, the terminal prompts: `No valid ChatGPT auth found. Launch browser login now? [Y/n]`
 - If you answer `Y` or press enter, the browser opens and the callback returns to `http://localhost:1455/auth/callback`
 
+## Configuration
+
+Environment variables:
+
+- `HOST`
+  - Default: `127.0.0.1`
+  - Listen host for the local server.
+- `PORT`
+  - Default: `1455`
+  - Listen port for the local server.
+- `LOG_LEVEL`
+  - Default: `info`
+  - Pino log level. Accepts `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`.
+- `UPSTREAM_TIMEOUT_MS`
+  - Default: `30000`
+  - Timeout used for OAuth token exchange and upstream Codex requests.
+
+The OAuth callback URL is derived from the current `PORT` and always uses:
+
+- `http://localhost:<PORT>/auth/callback`
+
 ## Auth files
 
 Primary auth file written by this project:

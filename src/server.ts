@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { pathToFileURL } from "node:url";
 
 import { createAppServices, type AppServices } from "./app-services.js";
+import { AuthFlowError } from "./auth/errors.js";
 import { maybePromptForLoginOnStartup } from "./auth/startup.js";
 import {
   buildOAuthRedirectUri,
@@ -98,9 +99,15 @@ export async function buildServer(
         }),
       );
     } catch (error) {
-      request.log.error(error);
+      const statusCode = error instanceof AuthFlowError ? error.statusCode : 500;
 
-      return reply.status(500).type("text/html").send(
+      if (error instanceof AuthFlowError) {
+        request.log.warn({ error }, "OAuth callback rejected");
+      } else {
+        request.log.error(error);
+      }
+
+      return reply.status(statusCode).type("text/html").send(
         renderCallbackPage({
           title: "Authentication failed",
           body:
