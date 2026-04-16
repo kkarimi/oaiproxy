@@ -16,6 +16,7 @@ const OAuthTokenResponseSchema = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().min(1),
 });
+type OAuthTokenResponse = z.infer<typeof OAuthTokenResponseSchema>;
 
 type PendingLogin = {
   state: string;
@@ -156,15 +157,40 @@ async function exchangeAuthorizationCode(input: {
   code: string;
   codeVerifier: string;
   redirectUri: string;
-}): Promise<z.infer<typeof OAuthTokenResponseSchema>> {
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    client_id: OAUTH_CLIENT_ID,
-    code: input.code,
-    redirect_uri: input.redirectUri,
-    code_verifier: input.codeVerifier,
-  });
+}): Promise<OAuthTokenResponse> {
+  return exchangeTokenGrant(
+    new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: OAUTH_CLIENT_ID,
+      code: input.code,
+      redirect_uri: input.redirectUri,
+      code_verifier: input.codeVerifier,
+    }),
+  );
+}
 
+export async function refreshOAuthTokens(
+  refreshToken: string,
+): Promise<StoredAuth> {
+  const tokenResponse = await exchangeTokenGrant(
+    new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: OAUTH_CLIENT_ID,
+      scope: OAUTH_SCOPES,
+    }),
+  );
+
+  return persistOAuthTokens({
+    idToken: tokenResponse.id_token,
+    accessToken: tokenResponse.access_token,
+    refreshToken: tokenResponse.refresh_token,
+  });
+}
+
+async function exchangeTokenGrant(
+  body: URLSearchParams,
+): Promise<OAuthTokenResponse> {
   const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: {
