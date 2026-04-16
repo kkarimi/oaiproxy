@@ -5,6 +5,7 @@ import { maybePromptForLoginOnStartup } from "./auth/startup.js";
 import { getAuthStatus } from "./auth/status.js";
 import { clearStoredAuth } from "./auth/token-store.js";
 import { loadConfig, type AppConfig } from "./config.js";
+import { listSupportedModels } from "./models.js";
 import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
 async function buildServer(config: AppConfig) {
@@ -15,6 +16,13 @@ async function buildServer(config: AppConfig) {
   app.get("/health", async () => {
     return {
       ok: true,
+    };
+  });
+
+  app.get("/v1/models", async () => {
+    return {
+      object: "list",
+      data: listSupportedModels(),
     };
   });
 
