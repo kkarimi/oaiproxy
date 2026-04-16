@@ -10,7 +10,8 @@ import {
   type AppConfig,
 } from "./config.js";
 import { createLogger } from "./logger.js";
-import { listSupportedModels } from "./models.js";
+import { getSupportedModel, listSupportedModels } from "./models.js";
+import { sendOpenAiError } from "./proxy/errors.js";
 import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
 export async function buildServer(
@@ -33,6 +34,22 @@ export async function buildServer(
       object: "list",
       data: listSupportedModels(config),
     };
+  });
+
+  app.get("/v1/models/:modelId", async (request, reply) => {
+    const { modelId } = request.params as { modelId: string };
+    const model = getSupportedModel(config, modelId);
+
+    if (!model) {
+      return sendOpenAiError(
+        reply,
+        404,
+        `The model "${modelId}" does not exist.`,
+        "not_found_error",
+      );
+    }
+
+    return model;
   });
 
   app.get("/auth/status", async () => {

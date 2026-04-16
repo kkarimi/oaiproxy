@@ -6,6 +6,7 @@ Current scope:
 
 - `POST /v1/chat/completions`
 - `GET /v1/models`
+- `GET /v1/models/:id`
 - `GET /health`
 - `POST /auth/login`
 - `POST /auth/logout`
@@ -99,6 +100,10 @@ If fallback auth is used, refreshes and new logins still write to `~/.chatgpt-co
 `GET /v1/models`
 
 - Returns the tested model list.
+
+`GET /v1/models/:id`
+
+- Returns a single model record for supported model ids.
 
 `POST /v1/chat/completions`
 

@@ -42,6 +42,30 @@ test("buildServer serves health and models routes", async (t) => {
       },
     ],
   });
+
+  const modelResponse = await app.inject({
+    method: "GET",
+    url: "/v1/models/gpt-5.4",
+  });
+  assert.equal(modelResponse.statusCode, 200);
+  assert.deepEqual(modelResponse.json(), {
+    id: "gpt-5.4",
+    object: "model",
+    created: 0,
+    owned_by: "openai",
+  });
+
+  const missingModelResponse = await app.inject({
+    method: "GET",
+    url: "/v1/models/gpt-4o",
+  });
+  assert.equal(missingModelResponse.statusCode, 404);
+  assert.deepEqual(missingModelResponse.json(), {
+    error: {
+      message: 'The model "gpt-4o" does not exist.',
+      type: "not_found_error",
+    },
+  });
 });
 
 test("buildServer uses injected auth service for auth status and logout", async (t) => {
