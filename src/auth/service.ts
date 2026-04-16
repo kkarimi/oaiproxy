@@ -70,6 +70,9 @@ export class AuthService implements AuthServiceLike {
   }
 
   async clearStoredAuth(): Promise<void> {
+    this.clearPendingLogin(
+      new AuthFlowError("OAuth login was cancelled by local auth reset."),
+    );
     await clearStoredAuth(this.config);
   }
 
