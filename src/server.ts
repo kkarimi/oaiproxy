@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 
 import { beginOAuthLogin, completeOAuthLogin } from "./auth/oauth.js";
+import { maybePromptForLoginOnStartup } from "./auth/startup.js";
+import { getAuthStatus } from "./auth/status.js";
 import { loadConfig, type AppConfig } from "./config.js";
 
 async function buildServer(config: AppConfig) {
@@ -12,6 +14,10 @@ async function buildServer(config: AppConfig) {
     return {
       ok: true,
     };
+  });
+
+  app.get("/auth/status", async () => {
+    return getAuthStatus();
   });
 
   app.post("/auth/login", async (_, reply) => {
@@ -92,6 +98,7 @@ async function start() {
       host: config.HOST,
       port: config.PORT,
     });
+    await maybePromptForLoginOnStartup(config.PORT);
   } catch (error) {
     app.log.error(error);
     process.exit(1);
