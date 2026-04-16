@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 
 import type { AppServices } from "../app-services.js";
 import type { AppConfig } from "../config.js";
+import { isSupportedModel } from "../models.js";
 import { OpenAIChatCompletionRequestSchema } from "../types/openai.js";
 import {
   ProxyRouteError,
@@ -23,6 +24,15 @@ export async function registerOpenAiChatRoute(
   app.post("/v1/chat/completions", async (request, reply) => {
     try {
       const parsedRequest = OpenAIChatCompletionRequestSchema.parse(request.body);
+
+      if (!isSupportedModel(config, parsedRequest.model)) {
+        throw new ProxyRouteError(
+          400,
+          "invalid_request_error",
+          `Unsupported model "${parsedRequest.model}". Supported models: ${config.proxy.supportedModels.join(", ")}.`,
+        );
+      }
+
       const upstreamRequest = translateChatToCodex(parsedRequest);
       const upstreamResponse = await sendCodexResponsesRequest(
         config,

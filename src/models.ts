@@ -8,3 +8,7 @@ export function listSupportedModels(config: AppConfig) {
     owned_by: "openai",
   }));
 }
+
+export function isSupportedModel(config: AppConfig, model: string): boolean {
+  return config.proxy.supportedModels.includes(model);
+}

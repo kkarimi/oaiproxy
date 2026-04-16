@@ -256,6 +256,35 @@ test("chat completions returns a validation error for invalid requests", async (
   assert.match(response.json().error.message, /expected string|required/i);
 });
 
+test("chat completions rejects unsupported models before proxying upstream", async (t) => {
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub(),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: {
+      model: "gpt-4o",
+      stream: true,
+      messages: [{ role: "user", content: "hello" }],
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), {
+    error: {
+      message: 'Unsupported model "gpt-4o". Supported models: gpt-5.4.',
+      type: "invalid_request_error",
+    },
+  });
+});
+
 test("chat completions returns auth_error when auth is missing", async (t) => {
   const app = await buildServer(
     loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
