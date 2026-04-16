@@ -66,7 +66,27 @@ export class AuthService implements AuthServiceLike {
       return buildMissingAuthStatus(this.config.auth.filePath);
     }
 
-    return buildAuthStatus(loadedAuth.storedAuth, loadedAuth.sourcePath, now);
+    let storedAuth = loadedAuth.storedAuth;
+    let sourcePath = loadedAuth.sourcePath;
+
+    if (
+      shouldRefreshStoredAuth(
+        storedAuth,
+        this.config.proxy.refreshWindowMs,
+        now,
+      )
+    ) {
+      try {
+        storedAuth = await this.refreshTokens(storedAuth.tokens.refresh_token);
+        sourcePath = this.config.auth.filePath;
+      } catch {
+        if (isStoredAuthExpired(storedAuth, now)) {
+          return buildAuthStatus(storedAuth, sourcePath, now);
+        }
+      }
+    }
+
+    return buildAuthStatus(storedAuth, sourcePath, now);
   }
 
   async clearStoredAuth(): Promise<void> {
