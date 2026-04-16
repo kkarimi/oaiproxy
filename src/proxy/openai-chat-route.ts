@@ -34,6 +34,16 @@ export async function registerOpenAiChatRoute(app: FastifyInstance): Promise<voi
 
       if (!upstreamResponse.ok) {
         const errorText = await upstreamResponse.text();
+
+        if (upstreamResponse.status === 401) {
+          return sendOpenAiError(
+            reply,
+            401,
+            "Stored ChatGPT auth was rejected by the upstream service. Re-run /auth/login or /auth/logout to reset local auth.",
+            "auth_error",
+          );
+        }
+
         return sendOpenAiError(
           reply,
           upstreamResponse.status,

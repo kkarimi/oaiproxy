@@ -39,7 +39,9 @@ export async function getStoredAuthWithRefresh(
     };
   } catch (error) {
     if (isStoredAuthExpired(storedAuth, now)) {
-      throw error;
+      throw new AuthRequiredError(
+        "Stored ChatGPT auth is expired and refresh failed. Start login again with POST /auth/login.",
+      );
     }
 
     return {

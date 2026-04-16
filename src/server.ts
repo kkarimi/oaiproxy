@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import { beginOAuthLogin, completeOAuthLogin } from "./auth/oauth.js";
 import { maybePromptForLoginOnStartup } from "./auth/startup.js";
 import { getAuthStatus } from "./auth/status.js";
+import { clearStoredAuth } from "./auth/token-store.js";
 import { loadConfig, type AppConfig } from "./config.js";
 import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
@@ -19,6 +20,14 @@ async function buildServer(config: AppConfig) {
 
   app.get("/auth/status", async () => {
     return getAuthStatus();
+  });
+
+  app.post("/auth/logout", async (_, reply) => {
+    await clearStoredAuth();
+
+    return reply.status(200).send({
+      ok: true,
+    });
   });
 
   app.post("/auth/login", async (_, reply) => {
