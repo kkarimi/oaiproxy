@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { pathToFileURL } from "node:url";
 
 import { beginOAuthLogin, completeOAuthLogin } from "./auth/oauth.js";
 import { maybePromptForLoginOnStartup } from "./auth/startup.js";
@@ -13,7 +14,7 @@ import { createLogger } from "./logger.js";
 import { listSupportedModels } from "./models.js";
 import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
-async function buildServer(config: AppConfig) {
+export async function buildServer(config: AppConfig) {
   const logger = createLogger(config);
   const app = Fastify({
     loggerInstance: logger,
@@ -115,7 +116,7 @@ async function buildServer(config: AppConfig) {
   return app;
 }
 
-async function start() {
+export async function startServer() {
   const config = loadConfig();
   const app = await buildServer(config);
   const startupLogger = app.log.child({ component: "startup" });
@@ -135,7 +136,9 @@ async function start() {
   }
 }
 
-void start();
+if (isMainModule()) {
+  void startServer();
+}
 
 function renderCallbackPage(input: { title: string; body: string }): string {
   return `<!doctype html>
@@ -209,4 +212,9 @@ function installSignalHandlers(app: Awaited<ReturnType<typeof buildServer>>) {
 
   process.on("SIGINT", handleSignal);
   process.on("SIGTERM", handleSignal);
+}
+
+function isMainModule(): boolean {
+  return Boolean(process.argv[1]) &&
+    import.meta.url === pathToFileURL(process.argv[1]).href;
 }

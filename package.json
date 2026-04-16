@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node --import tsx src/server.ts",
-    "test": "node --import tsx --test src/**/*.test.ts",
+    "test": "node --import tsx --test src/*.test.ts src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

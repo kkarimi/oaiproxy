@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { z } from "zod";
 
 import { getConfig } from "../config.js";
@@ -50,6 +50,7 @@ export async function saveStoredAuth(input: {
   lastRefresh: string | null;
 }): Promise<StoredAuth> {
   const config = getConfig();
+  const tempFilePath = `${config.auth.filePath}.${process.pid}.${Date.now()}.tmp`;
   const record = StoredAuthSchema.parse({
     provider: "openai-chatgpt-subscription",
     version: 1,
@@ -64,11 +65,18 @@ export async function saveStoredAuth(input: {
   });
 
   await mkdir(config.auth.directoryPath, { recursive: true });
-  await writeFile(config.auth.filePath, `${JSON.stringify(record, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  await chmod(config.auth.filePath, 0o600);
+  try {
+    await writeFile(tempFilePath, `${JSON.stringify(record, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    await chmod(tempFilePath, 0o600);
+    await rename(tempFilePath, config.auth.filePath);
+    await chmod(config.auth.filePath, 0o600);
+  } catch (error) {
+    await rm(tempFilePath, { force: true });
+    throw error;
+  }
 
   return record;
 }
