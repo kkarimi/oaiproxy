@@ -1,5 +1,5 @@
 import { type StoredAuth } from "./schema.js";
-import { AUTH_FILE_PATH, loadStoredAuth } from "./token-store.js";
+import { AUTH_FILE_PATH, loadStoredAuthWithSource } from "./token-store.js";
 
 export type AuthStatus = {
   authenticated: boolean;
@@ -13,9 +13,9 @@ export type AuthStatus = {
 };
 
 export async function getAuthStatus(now = new Date()): Promise<AuthStatus> {
-  const storedAuth = await loadStoredAuth();
+  const loadedAuth = await loadStoredAuthWithSource();
 
-  if (!storedAuth) {
+  if (!loadedAuth) {
     return {
       authenticated: false,
       reason: "missing",
@@ -28,13 +28,14 @@ export async function getAuthStatus(now = new Date()): Promise<AuthStatus> {
     };
   }
 
+  const { storedAuth, sourcePath } = loadedAuth;
   const expiresAt = new Date(storedAuth.claims.expires_at * 1000);
   const authenticated = isStoredAuthUsable(storedAuth, now);
 
   return {
     authenticated,
     reason: authenticated ? "ok" : "expired",
-    auth_path: AUTH_FILE_PATH,
+    auth_path: sourcePath,
     email: storedAuth.claims.email ?? null,
     plan_type: storedAuth.claims.plan_type ?? null,
     account_id: storedAuth.claims.chatgpt_account_id,

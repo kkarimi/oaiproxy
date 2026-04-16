@@ -1,11 +1,17 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { z } from "zod";
 
+import { decodeJwtPayload, extractAuthClaims } from "./claims.js";
 import { type AuthClaims, StoredAuthSchema, type StoredAuth } from "./schema.js";
 
 export const AUTH_DIRECTORY_PATH = path.join(os.homedir(), ".chatgpt-codex");
 export const AUTH_FILE_PATH = path.join(AUTH_DIRECTORY_PATH, "auth.json");
+export const CODEX_AUTH_FALLBACK_PATHS = [
+  process.env.CODEX_HOME ? path.join(process.env.CODEX_HOME, "auth.json") : null,
+  path.join(os.homedir(), ".codex", "auth.json"),
+].filter((candidate): candidate is string => Boolean(candidate));
 
 export type PersistedTokens = {
   idToken: string;
@@ -14,16 +20,31 @@ export type PersistedTokens = {
 };
 
 export async function loadStoredAuth(): Promise<StoredAuth | null> {
-  try {
-    const contents = await readFile(AUTH_FILE_PATH, "utf8");
-    return StoredAuthSchema.parse(JSON.parse(contents));
-  } catch (error) {
-    if (isMissingFileError(error)) {
-      return null;
-    }
+  const loadedAuth = await loadStoredAuthWithSource();
+  return loadedAuth?.storedAuth ?? null;
+}
 
-    throw error;
+export async function loadStoredAuthWithSource(): Promise<{
+  storedAuth: StoredAuth;
+  sourcePath: string;
+} | null> {
+  for (const candidatePath of [AUTH_FILE_PATH, ...CODEX_AUTH_FALLBACK_PATHS]) {
+    try {
+      const contents = await readFile(candidatePath, "utf8");
+      return {
+        storedAuth: parseStoredAuthContents(contents),
+        sourcePath: candidatePath,
+      };
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        continue;
+      }
+
+      throw error;
+    }
   }
+
+  return null;
 }
 
 export async function saveStoredAuth(input: {
@@ -65,4 +86,47 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
     "code" in error &&
     error.code === "ENOENT"
   );
+}
+
+function parseStoredAuthContents(contents: string): StoredAuth {
+  const json = JSON.parse(contents);
+  const parsedStoredAuth = StoredAuthSchema.safeParse(json);
+
+  if (parsedStoredAuth.success) {
+    return parsedStoredAuth.data;
+  }
+
+  return normalizeCodexAuthFile(json);
+}
+
+const CodexAuthFileSchema = z.object({
+  OPENAI_API_KEY: z.string().nullable().optional(),
+  tokens: z.object({
+    id_token: z.string().min(1),
+    access_token: z.string().min(1),
+    refresh_token: z.string().min(1),
+    account_id: z.string().min(1).optional(),
+  }),
+  last_refresh: z.string().optional(),
+});
+
+function normalizeCodexAuthFile(input: unknown): StoredAuth {
+  const parsed = CodexAuthFileSchema.parse(input);
+  const claims = extractAuthClaims(
+    decodeJwtPayload(parsed.tokens.id_token),
+    decodeJwtPayload(parsed.tokens.access_token),
+  );
+
+  return StoredAuthSchema.parse({
+    provider: "openai-chatgpt-subscription",
+    version: 1,
+    tokens: {
+      id_token: parsed.tokens.id_token,
+      access_token: parsed.tokens.access_token,
+      refresh_token: parsed.tokens.refresh_token,
+      account_id: parsed.tokens.account_id ?? claims.chatgpt_account_id,
+    },
+    claims,
+    last_refresh: parsed.last_refresh ?? null,
+  });
 }
