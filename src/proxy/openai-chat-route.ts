@@ -9,7 +9,9 @@ import {
 } from "./translate-codex-sse-to-openai.js";
 import { sendCodexResponsesRequest } from "./upstream.js";
 
-export async function registerOpenAiChatRoute(app: FastifyInstance): Promise<void> {
+export async function registerOpenAiChatRoute(
+  app: FastifyInstance<any, any, any, any>,
+): Promise<void> {
   app.post("/v1/chat/completions", async (request, reply) => {
     let parsedRequest;
 

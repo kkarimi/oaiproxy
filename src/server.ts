@@ -9,12 +9,14 @@ import {
   loadConfig,
   type AppConfig,
 } from "./config.js";
+import { createLogger } from "./logger.js";
 import { listSupportedModels } from "./models.js";
 import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
 async function buildServer(config: AppConfig) {
+  const logger = createLogger(config);
   const app = Fastify({
-    logger: true,
+    loggerInstance: logger,
   });
 
   app.get("/health", async () => {
@@ -116,13 +118,14 @@ async function buildServer(config: AppConfig) {
 async function start() {
   const config = loadConfig();
   const app = await buildServer(config);
+  const startupLogger = app.log.child({ component: "startup" });
 
   try {
     await app.listen({
       host: config.server.host,
       port: config.server.port,
     });
-    await maybePromptForLoginOnStartup(config.server.port);
+    await maybePromptForLoginOnStartup(config, startupLogger);
   } catch (error) {
     app.log.error(error);
     process.exit(1);

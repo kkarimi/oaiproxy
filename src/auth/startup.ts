@@ -1,13 +1,22 @@
 import readline from "node:readline/promises";
 
 import { beginOAuthLogin } from "./oauth.js";
+import { buildOAuthRedirectUri, type AppConfig } from "../config.js";
 import { getAuthStatus } from "./status.js";
 
-export async function maybePromptForLoginOnStartup(port: number): Promise<void> {
+type StartupLogger = {
+  info: (message: string) => void;
+  warn: (message: string) => void;
+};
+
+export async function maybePromptForLoginOnStartup(
+  config: AppConfig,
+  logger: StartupLogger,
+): Promise<void> {
   const status = await getAuthStatus();
 
   if (status.authenticated) {
-    console.log(
+    logger.info(
       `Authenticated ChatGPT subscription found for ${status.email ?? "account"} (${status.plan_type ?? "unknown plan"}).`,
     );
     return;
@@ -19,7 +28,7 @@ export async function maybePromptForLoginOnStartup(port: number): Promise<void> 
       : "No valid ChatGPT auth found.";
 
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    console.log(`${reason} Start login later with POST /auth/login.`);
+    logger.warn(`${reason} Start login later with POST /auth/login.`);
     return;
   }
 
@@ -34,25 +43,21 @@ export async function maybePromptForLoginOnStartup(port: number): Promise<void> 
     const shouldLaunch = answer === "" || answer === "y" || answer === "yes";
 
     if (!shouldLaunch) {
-      console.log("Login skipped. Use POST /auth/login to start OAuth later.");
+      logger.info("Login skipped. Use POST /auth/login to start OAuth later.");
       return;
     }
 
     const login = await beginOAuthLogin({
-      redirectUri: buildOAuthRedirectUri(port),
+      redirectUri: buildOAuthRedirectUri(config),
       openBrowserWindow: true,
     });
 
-    console.log("Browser login started. Waiting for OAuth callback...");
+    logger.info("Browser login started. Waiting for OAuth callback...");
     const storedAuth = await login.completion;
-    console.log(
+    logger.info(
       `Authenticated ${storedAuth.claims.email ?? "ChatGPT account"} (${storedAuth.claims.plan_type ?? "unknown plan"}).`,
     );
   } finally {
     rl.close();
   }
-}
-
-function buildOAuthRedirectUri(port: number): string {
-  return `http://localhost:${port}/auth/callback`;
 }
