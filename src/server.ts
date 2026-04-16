@@ -4,6 +4,7 @@ import { beginOAuthLogin, completeOAuthLogin } from "./auth/oauth.js";
 import { maybePromptForLoginOnStartup } from "./auth/startup.js";
 import { getAuthStatus } from "./auth/status.js";
 import { loadConfig, type AppConfig } from "./config.js";
+import { registerOpenAiChatRoute } from "./proxy/openai-chat-route.js";
 
 async function buildServer(config: AppConfig) {
   const app = Fastify({
@@ -85,6 +86,8 @@ async function buildServer(config: AppConfig) {
       );
     }
   });
+
+  await registerOpenAiChatRoute(app);
 
   return app;
 }
