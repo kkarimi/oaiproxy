@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import type { AuthService } from "../auth/service.js";
+import type { AuthServiceLike } from "../auth/service.js";
 
 export async function buildCodexUpstreamHeaders(
-  authService: AuthService,
+  authService: AuthServiceLike,
 ): Promise<Record<string, string>> {
   const storedAuth = await authService.requireStoredAuthWithRefresh();
 

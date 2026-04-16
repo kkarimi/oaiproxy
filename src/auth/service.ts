@@ -23,6 +23,26 @@ const OAuthTokenResponseSchema = z.object({
   refresh_token: z.string().min(1),
 });
 type OAuthTokenResponse = z.infer<typeof OAuthTokenResponseSchema>;
+export type AuthLoginResult = {
+  authorizationUrl: string;
+  completion: Promise<StoredAuth>;
+};
+export type AuthRefreshResult = {
+  storedAuth: StoredAuth | null;
+  refreshed: boolean;
+  refreshError: Error | null;
+};
+export type AuthServiceLike = {
+  getStatus(now?: Date): Promise<AuthStatus>;
+  clearStoredAuth(): Promise<void>;
+  beginLogin(options: {
+    redirectUri: string;
+    openBrowserWindow?: boolean;
+  }): Promise<AuthLoginResult>;
+  completeLogin(input: { code: string; state: string }): Promise<StoredAuth>;
+  getStoredAuthWithRefresh(now?: Date): Promise<AuthRefreshResult>;
+  requireStoredAuthWithRefresh(now?: Date): Promise<StoredAuth>;
+};
 
 type PendingLogin = {
   state: string;
@@ -34,7 +54,7 @@ type PendingLogin = {
   reject: (error: Error) => void;
 };
 
-export class AuthService {
+export class AuthService implements AuthServiceLike {
   private pendingLogin: PendingLogin | null = null;
 
   constructor(private readonly config: AppConfig) {}
@@ -56,10 +76,7 @@ export class AuthService {
   async beginLogin(options: {
     redirectUri: string;
     openBrowserWindow?: boolean;
-  }): Promise<{
-    authorizationUrl: string;
-    completion: Promise<StoredAuth>;
-  }> {
+  }): Promise<AuthLoginResult> {
     if (this.pendingLogin) {
       return {
         authorizationUrl: this.pendingLogin.authorizationUrl,
@@ -147,11 +164,7 @@ export class AuthService {
 
   async getStoredAuthWithRefresh(
     now = new Date(),
-  ): Promise<{
-    storedAuth: StoredAuth | null;
-    refreshed: boolean;
-    refreshError: Error | null;
-  }> {
+  ): Promise<AuthRefreshResult> {
     const storedAuth = await loadStoredAuth(this.config);
 
     if (!storedAuth) {

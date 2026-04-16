@@ -1,8 +1,8 @@
 import type { AppConfig } from "./config.js";
-import { AuthService } from "./auth/service.js";
+import { AuthService, type AuthServiceLike } from "./auth/service.js";
 
 export type AppServices = {
-  auth: AuthService;
+  auth: AuthServiceLike;
 };
 
 export function createAppServices(config: AppConfig): AppServices {

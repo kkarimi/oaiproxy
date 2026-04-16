@@ -1,6 +1,6 @@
 import readline from "node:readline/promises";
 
-import type { AuthService } from "./service.js";
+import type { AuthServiceLike } from "./service.js";
 import { buildOAuthRedirectUri, type AppConfig } from "../config.js";
 
 type StartupLogger = {
@@ -10,7 +10,7 @@ type StartupLogger = {
 
 export async function maybePromptForLoginOnStartup(
   config: AppConfig,
-  authService: AuthService,
+  authService: AuthServiceLike,
   logger: StartupLogger,
 ): Promise<void> {
   const status = await authService.getStatus();
