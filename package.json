@@ -10,7 +10,11 @@
   "scripts": {
     "start": "node --import tsx src/server.ts",
     "test": "node --import tsx --test src/*.test.ts src/**/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "launchd:install": "./scripts/launch-agent.sh install",
+    "launchd:uninstall": "./scripts/launch-agent.sh uninstall",
+    "launchd:status": "./scripts/launch-agent.sh status",
+    "launchd:logs": "./scripts/launch-agent.sh logs"
   },
   "dependencies": {
     "fastify": "^5.2.1",

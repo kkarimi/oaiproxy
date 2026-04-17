@@ -43,6 +43,63 @@ On startup:
 - If auth is missing, the terminal prompts: `No valid ChatGPT auth found. Launch browser login now? [Y/n]`
 - If you answer `Y` or press enter, the browser opens and the callback returns to `http://localhost:1455/auth/callback`
 
+## Run As A LaunchAgent
+
+The clean macOS way to keep this running for a local OpenAI-compatible client is a user-scoped `launchd` agent.
+
+That is exactly what I set up locally:
+
+- a plist under `~/Library/LaunchAgents/`
+- absolute `node` path in `ProgramArguments`
+- repo root as `WorkingDirectory`
+- stdout/stderr sent to log files under `~/Library/Logs/oaiproxy/`
+
+Important: install auth first. The background agent has no interactive terminal, so do one successful login with:
+
+```bash
+npm run start
+```
+
+After auth exists, install the LaunchAgent:
+
+```bash
+npm run launchd:install
+```
+
+Useful commands:
+
+```bash
+npm run launchd:status
+npm run launchd:logs
+npm run launchd:uninstall
+```
+
+Defaults used by the LaunchAgent:
+
+- Label: `dev.oaiproxy.server`
+- Plist: `~/Library/LaunchAgents/dev.oaiproxy.server.plist`
+- Logs:
+  - `~/Library/Logs/oaiproxy/stdout.log`
+  - `~/Library/Logs/oaiproxy/stderr.log`
+
+You can override the runtime parameters at install time:
+
+```bash
+PORT=1555 LOG_LEVEL=debug npm run launchd:install
+```
+
+You can also pin a specific Node binary if your shell uses a version manager:
+
+```bash
+NODE_BINARY="$(command -v node)" npm run launchd:install
+```
+
+If your reusable auth lives under a custom `CODEX_HOME`, pass that during install too:
+
+```bash
+CODEX_HOME="/path/to/codex-home" npm run launchd:install
+```
+
 ## Configuration
 
 Environment variables:
@@ -160,15 +217,17 @@ curl http://127.0.0.1:1455/v1/chat/completions \
   }'
 ```
 
-## OpenOats setup
+## Client setup
 
-For the OpenAI-compatible provider slot in OpenOats, use:
+For any OpenAI-compatible client, use:
 
 - Base URL: `http://127.0.0.1:1455`
 - Model: `gpt-5.4`
 - API key: leave blank unless the client insists on a value
 
 The prototype route to use is `/v1/chat/completions`.
+
+If you installed the LaunchAgent with a custom port, use that port in the client too.
 
 ## Development
 
