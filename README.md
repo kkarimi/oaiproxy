@@ -1,6 +1,6 @@
 # oaiproxy
 
-Local-only Node/TypeScript proxy that signs into a ChatGPT subscription account and exposes an OpenAI-compatible API on `http://127.0.0.1:1455`.
+Simple experimental proxy and local bridge that signs into a ChatGPT subscription account and exposes an OpenAI-compatible API on `http://127.0.0.1:1455`.
 
 Current scope:
 
@@ -13,7 +13,6 @@ Current scope:
 - `GET /auth/status`
 - `GET /auth/callback`
 
-This is an experimental local bridge. It is not a hosted service and it is not trying to emulate the full OpenAI API.
 
 ## Requirements
 
