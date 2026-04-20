@@ -24,9 +24,6 @@ export function translateChatToCodex(
     input,
     stream: true,
     store: false,
-    ...(parsedRequest.max_tokens
-      ? { max_output_tokens: parsedRequest.max_tokens }
-      : {}),
   };
 }
 

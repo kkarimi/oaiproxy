@@ -147,7 +147,8 @@ install_agent() {
   write_plist
   bootout_if_loaded
   launchctl bootstrap "${DOMAIN}" "${PLIST_PATH}"
-  launchctl kickstart -k "${DOMAIN}/${LABEL}"
+  # RunAtLoad starts the service; kickstart only needed if already bootstrapped
+  launchctl kickstart -k "${DOMAIN}/${LABEL}" >/dev/null 2>&1 || true
 
   cat <<EOF
 Installed ${LABEL}

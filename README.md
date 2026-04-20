@@ -1,6 +1,6 @@
 # oaiproxy
 
-Simple experimental proxy and local bridge that signs into a ChatGPT subscription account and exposes an OpenAI-compatible API on `http://127.0.0.1:1455`.
+Simple experimental proxy and local bridge that signs into a ChatGPT subscription account and exposes an OpenAI-compatible API on `http://127.0.0.1:1456`.
 
 Current scope:
 
@@ -87,6 +87,19 @@ You can override the runtime parameters at install time:
 ```bash
 PORT=1555 LOG_LEVEL=debug npm run launchd:install
 ```
+
+To change the port after the agent is already installed, edit the plist directly and reload:
+
+```bash
+# 1. Edit the PORT value in the plist
+nano ~/Library/LaunchAgents/dev.oaiproxy.server.plist
+
+# 2. Reload (this stops the running process and starts it on the new port)
+launchctl unload ~/Library/LaunchAgents/dev.oaiproxy.server.plist
+launchctl load  ~/Library/LaunchAgents/dev.oaiproxy.server.plist
+```
+
+Do not kill the process with `kill` or `pkill` — `KeepAlive` is set, so launchd will immediately restart it on the old port.
 
 You can also pin a specific Node binary if your shell uses a version manager:
 

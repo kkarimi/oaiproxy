@@ -19,6 +19,8 @@ export async function proxyRouteErrorFromUpstream(
 ): Promise<ProxyRouteError> {
   const errorText = await upstreamResponse.text();
 
+  console.error(`[upstream error] status=${upstreamResponse.status} body=${errorText}`);
+
   if (upstreamResponse.status === 401) {
     return new ProxyRouteError(
       401,
