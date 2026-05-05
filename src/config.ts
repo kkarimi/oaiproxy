@@ -70,7 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     proxy: {
       codexResponsesUrl: "https://chatgpt.com/backend-api/codex/responses",
-      supportedModels: ["gpt-5.4"],
+      supportedModels: ["gpt-5.4", "gpt-5.5"],
       refreshWindowMs: 5 * 60 * 1000,
       upstreamTimeoutMs: parsedEnv.UPSTREAM_TIMEOUT_MS,
     },

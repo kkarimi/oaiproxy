@@ -20,7 +20,7 @@ export function translateChatToCodex(
 
   return {
     model: parsedRequest.model,
-    ...(instructions ? { instructions } : {}),
+    instructions: instructions ?? "",
     input,
     stream: true,
     store: false,
