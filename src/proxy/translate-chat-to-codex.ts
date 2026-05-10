@@ -1,9 +1,15 @@
 import {
   OpenAIChatCompletionRequestSchema,
+  type OpenAIChatContentPart,
   type OpenAIChatCompletionRequest,
   type OpenAIChatMessage,
 } from "../types/openai.js";
-import { type CodexInputMessage, type CodexResponsesRequest } from "../types/codex.js";
+import {
+  type CodexInputMessage,
+  type CodexInputPart,
+  type CodexResponsesRequest,
+} from "../types/codex.js";
+import { ProxyRouteError } from "./errors.js";
 
 export function translateChatToCodex(
   request: unknown,
@@ -15,7 +21,11 @@ export function translateChatToCodex(
     .map(translateMessageToCodexInput);
 
   if (input.length === 0) {
-    throw new Error("At least one non-system message is required");
+    throw new ProxyRouteError(
+      400,
+      "invalid_request_error",
+      "At least one non-system message is required",
+    );
   }
 
   return {
@@ -24,6 +34,7 @@ export function translateChatToCodex(
     input,
     stream: true,
     store: false,
+    ...(parsedRequest.max_tokens ? { max_output_tokens: parsedRequest.max_tokens } : {}),
   };
 }
 
@@ -47,12 +58,7 @@ function translateMessageToCodexInput(message: OpenAIChatMessage): CodexInputMes
   return {
     type: "message",
     role: message.role,
-    content: [
-      {
-        type: "input_text",
-        text: normalizeMessageContent(message),
-      },
-    ],
+    content: translateContentParts(message.content),
   };
 }
 
@@ -61,5 +67,37 @@ function normalizeMessageContent(message: OpenAIChatMessage): string {
     return message.content;
   }
 
-  return message.content.map((part) => part.text).join("\n");
+  return message.content.map((part) => {
+    if (part.type !== "text") {
+      throw new ProxyRouteError(
+        400,
+        "invalid_request_error",
+        "System messages only support text content",
+      );
+    }
+    return part.text;
+  }).join("\n");
+}
+
+function translateContentParts(content: OpenAIChatMessage["content"]): CodexInputPart[] {
+  if (typeof content === "string") {
+    return [{ type: "input_text", text: content }];
+  }
+
+  return content.map(translateContentPart);
+}
+
+function translateContentPart(part: OpenAIChatContentPart): CodexInputPart {
+  if (part.type === "text") {
+    return {
+      type: "input_text",
+      text: part.text,
+    };
+  }
+
+  return {
+    type: "input_image",
+    image_url: part.image_url.url,
+    ...(part.image_url.detail ? { detail: part.image_url.detail } : {}),
+  };
 }
