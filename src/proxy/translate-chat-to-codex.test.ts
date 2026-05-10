@@ -35,7 +35,6 @@ test("translateChatToCodex maps OpenAI chat requests into Codex requests", () =>
     ],
     stream: true,
     store: false,
-    max_output_tokens: 256,
   });
 });
 

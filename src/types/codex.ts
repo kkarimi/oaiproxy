@@ -23,5 +23,4 @@ export type CodexResponsesRequest = {
   input: CodexInputMessage[];
   stream: true;
   store: false;
-  max_output_tokens?: number;
 };
