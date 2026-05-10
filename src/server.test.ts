@@ -40,6 +40,12 @@ test("buildServer serves health and models routes", async (t) => {
         created: 0,
         owned_by: "openai",
       },
+      {
+        id: "gpt-5.5",
+        object: "model",
+        created: 0,
+        owned_by: "openai",
+      },
     ],
   });
 
@@ -280,6 +286,50 @@ test("chat completions returns a validation error for invalid requests", async (
   assert.match(response.json().error.message, /expected string|required/i);
 });
 
+test("chat completions rejects image content in system instructions", async (t) => {
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub({
+      async requireStoredAuthWithRefresh() {
+        return createStoredAuth();
+      },
+    }),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: {
+      model: "gpt-5.5",
+      stream: false,
+      messages: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: "https://example.test/image.png" },
+            },
+          ],
+        },
+        { role: "user", content: "hello" },
+      ],
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), {
+    error: {
+      message: "System messages only support text content",
+      type: "invalid_request_error",
+    },
+  });
+});
+
 test("chat completions rejects unsupported models before proxying upstream", async (t) => {
   const app = await buildServer(
     loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
@@ -303,7 +353,7 @@ test("chat completions rejects unsupported models before proxying upstream", asy
   assert.equal(response.statusCode, 400);
   assert.deepEqual(response.json(), {
     error: {
-      message: 'Unsupported model "gpt-4o". Supported models: gpt-5.4.',
+      message: 'Unsupported model "gpt-4o". Supported models: gpt-5.4, gpt-5.5.',
       type: "invalid_request_error",
     },
   });

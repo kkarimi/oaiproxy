@@ -178,6 +178,7 @@ If fallback auth is used, refreshes and new logins still write to `~/.chatgpt-co
 
 - Supports both `stream: true` and `stream: false`
 - Converts OpenAI chat messages into the upstream Codex responses format
+- Preserves multimodal user content with OpenAI-compatible `image_url` parts
 - Translates upstream SSE back into OpenAI-compatible chat completion output
 
 ## Quick checks
@@ -226,6 +227,33 @@ curl http://127.0.0.1:1455/v1/chat/completions \
     "messages": [
       { "role": "system", "content": "Reply briefly." },
       { "role": "user", "content": "Say hello in three words." }
+    ]
+  }'
+```
+
+Multimodal chat completion:
+
+```bash
+curl http://127.0.0.1:1455/v1/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{
+    "model": "gpt-5.5",
+    "stream": false,
+    "messages": [
+      { "role": "system", "content": "Describe images briefly." },
+      {
+        "role": "user",
+        "content": [
+          { "type": "text", "text": "What is important in this image?" },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "data:image/png;base64,...",
+              "detail": "low"
+            }
+          }
+        ]
+      }
     ]
   }'
 ```
