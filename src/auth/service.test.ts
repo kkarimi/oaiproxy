@@ -114,6 +114,7 @@ function buildTestConfig(
     auth: {
       startupLoginPrompt: false,
       routesEnabled: true,
+      openBrowserOnLogin: true,
       redirectHost: "localhost",
       callbackPath: "/auth/callback",
       directoryPath: path.join(tempRoot, ".chatgpt-codex"),

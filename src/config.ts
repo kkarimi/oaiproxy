@@ -41,6 +41,7 @@ export type AppConfig = {
   auth: {
     startupLoginPrompt: boolean;
     routesEnabled: boolean;
+    openBrowserOnLogin: boolean;
     redirectHost: string;
     callbackPath: string;
     directoryPath: string;
@@ -80,7 +81,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     auth: {
       startupLoginPrompt:
         parsedEnv.OAI_PROXY_STARTUP_LOGIN_PROMPT ?? !serviceMode,
-      routesEnabled: parsedEnv.OAI_PROXY_AUTH_ROUTES_ENABLED ?? !serviceMode,
+      routesEnabled: parsedEnv.OAI_PROXY_AUTH_ROUTES_ENABLED ?? true,
+      openBrowserOnLogin: !serviceMode,
       redirectHost: "localhost",
       callbackPath: "/auth/callback",
       directoryPath: authDirectoryPath,

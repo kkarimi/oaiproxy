@@ -125,8 +125,17 @@ OAI_PROXY_SERVICE_MODE=true HOST=0.0.0.0 oaiproxy
 Service mode:
 
 - disables the startup browser-login prompt
-- disables `/auth/*` routes
-- keeps `/health`, `/ready`, and `/v1/*` routes available
+- keeps `/auth/*`, `/health`, `/ready`, and `/v1/*` routes available
+- makes `/auth/login` return the login URL without trying to open a browser from the service process
+
+Manual service-mode auth flow:
+
+1. Call `POST /auth/login` on the running service.
+2. Open the returned `authorization_url` in a browser.
+3. After the browser redirects to `http://localhost:<PORT>/auth/callback?...`, copy the full callback URL.
+4. Send that callback URL back to the running service, for example with `curl` from a shell or exec session that can reach the service's `localhost:<PORT>`.
+
+Persisting the auth JSON in a service-safe store, such as a single Secrets Manager secret, is intentionally left for a follow-up change.
 
 Build a local container image:
 
@@ -160,7 +169,7 @@ Environment variables:
   - Default: `false`
   - Set to `true` for non-interactive service/container mode.
 - `OAI_PROXY_AUTH_ROUTES_ENABLED`
-  - Default: `true` locally, `false` in service mode.
+  - Default: `true`
   - Enables or disables `/auth/*` routes.
 - `OAI_PROXY_STARTUP_LOGIN_PROMPT`
   - Default: `true` locally, `false` in service mode.

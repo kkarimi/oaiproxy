@@ -138,14 +138,29 @@ test("buildServer uses injected auth service for auth status and logout", async 
   assert.equal(logoutCalled, true);
 });
 
-test("buildServer disables auth routes in service mode", async (t) => {
+test("auth login route returns the login URL without opening a browser in service mode", async (t) => {
+  let beginLoginInput:
+    | {
+        redirectUri: string;
+        openBrowserWindow?: boolean;
+      }
+    | undefined;
+
   const app = await buildServer(
     loadConfig({
       ...process.env,
       LOG_LEVEL: "silent",
       OAI_PROXY_SERVICE_MODE: "true",
     }),
-    createAuthServiceStub(),
+    createAuthServiceStub({
+      async beginLogin(input) {
+        beginLoginInput = input;
+        return {
+          authorizationUrl: "https://example.com/login",
+          completion: new Promise(() => {}),
+        };
+      },
+    }),
   );
 
   t.after(async () => {
@@ -156,13 +171,21 @@ test("buildServer disables auth routes in service mode", async (t) => {
     method: "GET",
     url: "/auth/status",
   });
-  assert.equal(statusResponse.statusCode, 404);
+  assert.equal(statusResponse.statusCode, 200);
 
   const loginResponse = await app.inject({
     method: "POST",
     url: "/auth/login",
   });
-  assert.equal(loginResponse.statusCode, 404);
+  assert.equal(loginResponse.statusCode, 202);
+  assert.deepEqual(loginResponse.json(), {
+    ok: true,
+    authorization_url: "https://example.com/login",
+  });
+  assert.deepEqual(beginLoginInput, {
+    redirectUri: "http://localhost:1455/auth/callback",
+    openBrowserWindow: false,
+  });
 });
 
 test("ready route reports missing auth as unavailable", async (t) => {

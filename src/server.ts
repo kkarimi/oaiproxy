@@ -84,7 +84,7 @@ export async function buildServer(
     app.post("/auth/login", async (_, reply) => {
       const login = await services.auth.beginLogin({
         redirectUri: buildOAuthRedirectUri(config),
-        openBrowserWindow: true,
+        openBrowserWindow: config.auth.openBrowserOnLogin,
       });
 
       return reply.status(202).send({
