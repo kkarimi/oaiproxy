@@ -52,7 +52,7 @@ export async function registerOpenAiChatRoute(
         );
       }
 
-      if (parsedRequest.stream === false) {
+      if (parsedRequest.stream !== true) {
         const completion = await collectCodexSseToOpenAiCompletion({
           upstreamResponse,
           model: parsedRequest.model,

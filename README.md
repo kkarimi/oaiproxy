@@ -1,6 +1,6 @@
 # oaiproxy
 
-Simple experimental proxy and local bridge that signs into a ChatGPT subscription account and exposes an OpenAI-compatible API on `http://127.0.0.1:1456`.
+Simple experimental proxy and local bridge that signs into a ChatGPT subscription account and exposes an OpenAI-compatible API on `http://127.0.0.1:1455`.
 
 Current scope:
 
@@ -8,6 +8,7 @@ Current scope:
 - `GET /v1/models`
 - `GET /v1/models/:id`
 - `GET /health`
+- `GET /ready`
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/status`
@@ -113,6 +114,32 @@ If your reusable auth lives under a custom `CODEX_HOME`, pass that during instal
 CODEX_HOME="/path/to/codex-home" oaiproxy-launchd install
 ```
 
+## Run As A Service
+
+For a container or sidecar process, enable service mode:
+
+```bash
+OAI_PROXY_SERVICE_MODE=true HOST=0.0.0.0 oaiproxy
+```
+
+Service mode:
+
+- disables the startup browser-login prompt
+- disables `/auth/*` routes
+- keeps `/health`, `/ready`, and `/v1/*` routes available
+
+Build a local container image:
+
+```bash
+docker build -t oai-proxy:local .
+```
+
+Run it locally:
+
+```bash
+docker run --rm -p 1455:1455 oai-proxy:local
+```
+
 ## Configuration
 
 Environment variables:
@@ -129,6 +156,15 @@ Environment variables:
 - `UPSTREAM_TIMEOUT_MS`
   - Default: `30000`
   - Timeout used for OAuth token exchange and upstream Codex requests.
+- `OAI_PROXY_SERVICE_MODE`
+  - Default: `false`
+  - Set to `true` for non-interactive service/container mode.
+- `OAI_PROXY_AUTH_ROUTES_ENABLED`
+  - Default: `true` locally, `false` in service mode.
+  - Enables or disables `/auth/*` routes.
+- `OAI_PROXY_STARTUP_LOGIN_PROMPT`
+  - Default: `true` locally, `false` in service mode.
+  - Controls the interactive startup login prompt.
 
 The OAuth callback URL is derived from the current `PORT` and always uses:
 
@@ -153,6 +189,10 @@ If fallback auth is used, refreshes and new logins still write to `~/.chatgpt-co
 
 - Simple liveness check.
 
+`GET /ready`
+
+- Readiness check that returns `503` when auth is missing or expired.
+
 `GET /auth/status`
 
 - Shows whether auth is usable.
@@ -176,7 +216,7 @@ If fallback auth is used, refreshes and new logins still write to `~/.chatgpt-co
 
 `POST /v1/chat/completions`
 
-- Supports both `stream: true` and `stream: false`
+- Supports both `stream: true` and non-streaming responses. Omitted `stream` defaults to non-streaming, matching OpenAI chat completions.
 - Converts OpenAI chat messages into the upstream Codex responses format
 - Preserves multimodal user content with OpenAI-compatible `image_url` parts
 - Translates upstream SSE back into OpenAI-compatible chat completion output

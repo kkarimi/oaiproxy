@@ -29,6 +29,22 @@ export async function buildServer(
     };
   });
 
+  app.get("/ready", async (_, reply) => {
+    const authStatus = await services.auth.getStatus();
+
+    if (!authStatus.authenticated) {
+      return reply.status(503).send({
+        ok: false,
+        auth: authStatus,
+      });
+    }
+
+    return {
+      ok: true,
+      auth: authStatus,
+    };
+  });
+
   app.get("/v1/models", async () => {
     return {
       object: "list",
@@ -52,89 +68,92 @@ export async function buildServer(
     return model;
   });
 
-  app.get("/auth/status", async () => {
-    return services.auth.getStatus();
-  });
-
-  app.post("/auth/logout", async (_, reply) => {
-    await services.auth.clearStoredAuth();
-
-    return reply.status(200).send({
-      ok: true,
-    });
-  });
-
-  app.post("/auth/login", async (_, reply) => {
-    const login = await services.auth.beginLogin({
-      redirectUri: buildOAuthRedirectUri(config),
-      openBrowserWindow: true,
+  if (config.auth.routesEnabled) {
+    app.get("/auth/status", async () => {
+      return services.auth.getStatus();
     });
 
-    return reply.status(202).send({
-      ok: true,
-      authorization_url: login.authorizationUrl,
+    app.post("/auth/logout", async (_, reply) => {
+      await services.auth.clearStoredAuth();
+
+      return reply.status(200).send({
+        ok: true,
+      });
     });
-  });
 
-  app.get("/auth/callback", async (request, reply) => {
-    const query = request.query as {
-      code?: string;
-      state?: string;
-      error?: string;
-      error_description?: string;
-    };
-
-    if (query.error) {
-      const description = query.error_description ?? "Unknown OAuth error";
-      return reply.status(400).type("text/html").send(
-        renderCallbackPage({
-          title: "Authentication failed",
-          body: `${query.error}: ${description}`,
-        }),
-      );
-    }
-
-    if (!query.code || !query.state) {
-      return reply.status(400).type("text/html").send(
-        renderCallbackPage({
-          title: "Missing callback parameters",
-          body: "The OAuth callback did not include both code and state.",
-        }),
-      );
-    }
-
-    try {
-      const storedAuth = await services.auth.completeLogin({
-        code: query.code,
-        state: query.state,
+    app.post("/auth/login", async (_, reply) => {
+      const login = await services.auth.beginLogin({
+        redirectUri: buildOAuthRedirectUri(config),
+        openBrowserWindow: true,
       });
 
-      return reply.type("text/html").send(
-        renderCallbackPage({
-          title: "Authentication complete",
-          body: `Authenticated ${storedAuth.claims.email ?? "ChatGPT account"}. You can return to the terminal.`,
-        }),
-      );
-    } catch (error) {
-      const statusCode = error instanceof AuthFlowError ? error.statusCode : 500;
+      return reply.status(202).send({
+        ok: true,
+        authorization_url: login.authorizationUrl,
+      });
+    });
 
-      if (error instanceof AuthFlowError) {
-        request.log.warn({ error }, "OAuth callback rejected");
-      } else {
-        request.log.error(error);
+    app.get("/auth/callback", async (request, reply) => {
+      const query = request.query as {
+        code?: string;
+        state?: string;
+        error?: string;
+        error_description?: string;
+      };
+
+      if (query.error) {
+        const description = query.error_description ?? "Unknown OAuth error";
+        return reply.status(400).type("text/html").send(
+          renderCallbackPage({
+            title: "Authentication failed",
+            body: `${query.error}: ${description}`,
+          }),
+        );
       }
 
-      return reply.status(statusCode).type("text/html").send(
-        renderCallbackPage({
-          title: "Authentication failed",
-          body:
-            error instanceof Error
-              ? error.message
-              : "Unexpected OAuth callback failure.",
-        }),
-      );
-    }
-  });
+      if (!query.code || !query.state) {
+        return reply.status(400).type("text/html").send(
+          renderCallbackPage({
+            title: "Missing callback parameters",
+            body: "The OAuth callback did not include both code and state.",
+          }),
+        );
+      }
+
+      try {
+        const storedAuth = await services.auth.completeLogin({
+          code: query.code,
+          state: query.state,
+        });
+
+        return reply.type("text/html").send(
+          renderCallbackPage({
+            title: "Authentication complete",
+            body: `Authenticated ${storedAuth.claims.email ?? "ChatGPT account"}. You can return to the terminal.`,
+          }),
+        );
+      } catch (error) {
+        const statusCode =
+          error instanceof AuthFlowError ? error.statusCode : 500;
+
+        if (error instanceof AuthFlowError) {
+          request.log.warn({ error }, "OAuth callback rejected");
+        } else {
+          request.log.error(error);
+        }
+
+        return reply.status(statusCode).type("text/html").send(
+          renderCallbackPage({
+            title: "Authentication failed",
+            body:
+              error instanceof Error
+                ? error.message
+                : "Unexpected OAuth callback failure.",
+          }),
+        );
+      }
+    });
+  }
 
   await registerOpenAiChatRoute(app, config, services);
 

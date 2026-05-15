@@ -3,10 +3,29 @@ import path from "node:path";
 
 import { z } from "zod";
 
+const EnvBooleanSchema = z.preprocess((value) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value === "true" || value === "1") {
+    return true;
+  }
+
+  if (value === "false" || value === "0") {
+    return false;
+  }
+
+  return value;
+}, z.boolean());
+
 const EnvSchema = z.object({
   HOST: z.string().default("127.0.0.1"),
   PORT: z.coerce.number().int().positive().default(1455),
   UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  OAI_PROXY_SERVICE_MODE: EnvBooleanSchema.default(false),
+  OAI_PROXY_AUTH_ROUTES_ENABLED: EnvBooleanSchema.optional(),
+  OAI_PROXY_STARTUP_LOGIN_PROMPT: EnvBooleanSchema.optional(),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
@@ -21,6 +40,7 @@ export type AppConfig = {
   };
   auth: {
     startupLoginPrompt: boolean;
+    routesEnabled: boolean;
     redirectHost: string;
     callbackPath: string;
     directoryPath: string;
@@ -44,6 +64,7 @@ export type AppConfig = {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsedEnv = EnvSchema.parse(env);
+  const serviceMode = parsedEnv.OAI_PROXY_SERVICE_MODE;
   const authDirectoryPath = path.join(os.homedir(), ".chatgpt-codex");
   const authFilePath = path.join(authDirectoryPath, "auth.json");
   const codexFallbackPaths = [
@@ -57,7 +78,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       port: parsedEnv.PORT,
     },
     auth: {
-      startupLoginPrompt: true,
+      startupLoginPrompt:
+        parsedEnv.OAI_PROXY_STARTUP_LOGIN_PROMPT ?? !serviceMode,
+      routesEnabled: parsedEnv.OAI_PROXY_AUTH_ROUTES_ENABLED ?? !serviceMode,
       redirectHost: "localhost",
       callbackPath: "/auth/callback",
       directoryPath: authDirectoryPath,

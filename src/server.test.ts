@@ -138,6 +138,66 @@ test("buildServer uses injected auth service for auth status and logout", async 
   assert.equal(logoutCalled, true);
 });
 
+test("buildServer disables auth routes in service mode", async (t) => {
+  const app = await buildServer(
+    loadConfig({
+      ...process.env,
+      LOG_LEVEL: "silent",
+      OAI_PROXY_SERVICE_MODE: "true",
+    }),
+    createAuthServiceStub(),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const statusResponse = await app.inject({
+    method: "GET",
+    url: "/auth/status",
+  });
+  assert.equal(statusResponse.statusCode, 404);
+
+  const loginResponse = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+  });
+  assert.equal(loginResponse.statusCode, 404);
+});
+
+test("ready route reports missing auth as unavailable", async (t) => {
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub({
+      async getStatus() {
+        return {
+          authenticated: false,
+          reason: "missing",
+          auth_path: "/tmp/auth.json",
+          email: null,
+          plan_type: null,
+          account_id: null,
+          expires_at: null,
+          expires_at_unix: null,
+        };
+      },
+    }),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/ready",
+  });
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.json().ok, false);
+  assert.equal(response.json().auth.authenticated, false);
+});
+
 test("auth login route starts browser login through the auth service", async (t) => {
   let beginLoginInput:
     | {
@@ -388,6 +448,75 @@ test("chat completions returns auth_error when auth is missing", async (t) => {
     error: {
       message: "Login required",
       type: "auth_error",
+    },
+  });
+});
+
+test("chat completions defaults to non-streaming OpenAI responses", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const upstreamBody = [
+    "event: response.created",
+    'data: {"type":"response.created","response":{"id":"resp_123","created_at":123}}',
+    "",
+    "event: response.output_text.delta",
+    'data: {"type":"response.output_text.delta","delta":"Hello"}',
+    "",
+    "event: response.completed",
+    'data: {"type":"response.completed","response":{"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}}',
+    "",
+  ].join("\n");
+
+  globalThis.fetch = (async () =>
+    new Response(upstreamBody, {
+      status: 200,
+      headers: {
+        "content-type": "text/event-stream",
+      },
+    })) as typeof fetch;
+
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub({
+      async requireStoredAuthWithRefresh() {
+        return createStoredAuth();
+      },
+    }),
+  );
+
+  t.after(async () => {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: {
+      model: "gpt-5.4",
+      messages: [{ role: "user", content: "hello" }],
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    id: "resp_123",
+    object: "chat.completion",
+    created: 123,
+    model: "gpt-5.4",
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: "Hello",
+        },
+        finish_reason: "stop",
+      },
+    ],
+    usage: {
+      prompt_tokens: 2,
+      completion_tokens: 1,
+      total_tokens: 3,
     },
   });
 });
