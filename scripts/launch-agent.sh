@@ -81,10 +81,10 @@ EOF
 No auth file found.
 
 Complete browser auth first with:
-  npm run start
+  oaiproxy
 
 Then re-run:
-  npm run launchd:install
+  oaiproxy-launchd install
 EOF
     exit 1
   fi
@@ -101,9 +101,7 @@ EOF
   <key>ProgramArguments</key>
   <array>
     <string>${node_bin}</string>
-    <string>--import</string>
-    <string>tsx</string>
-    <string>src/server.ts</string>
+    <string>dist/server.js</string>
   </array>
   <key>WorkingDirectory</key>
   <string>${PROJECT_ROOT}</string>
@@ -156,8 +154,8 @@ Installed ${LABEL}
   logs:  ${LOG_DIR}
 
 Use:
-  npm run launchd:status
-  npm run launchd:logs
+  oaiproxy-launchd status
+  oaiproxy-launchd logs
 EOF
 }
 

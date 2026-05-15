@@ -23,13 +23,13 @@ Current scope:
 ## Install
 
 ```bash
-npm install
+npm install -g @nima__/oai-proxy
 ```
 
 ## Run
 
 ```bash
-npm run start
+oaiproxy
 ```
 
 Default listen address:
@@ -57,21 +57,21 @@ That is exactly what I set up locally:
 Important: install auth first. The background agent has no interactive terminal, so do one successful login with:
 
 ```bash
-npm run start
+oaiproxy
 ```
 
 After auth exists, install the LaunchAgent:
 
 ```bash
-npm run launchd:install
+oaiproxy-launchd install
 ```
 
 Useful commands:
 
 ```bash
-npm run launchd:status
-npm run launchd:logs
-npm run launchd:uninstall
+oaiproxy-launchd status
+oaiproxy-launchd logs
+oaiproxy-launchd uninstall
 ```
 
 Defaults used by the LaunchAgent:
@@ -85,7 +85,7 @@ Defaults used by the LaunchAgent:
 You can override the runtime parameters at install time:
 
 ```bash
-PORT=1555 LOG_LEVEL=debug npm run launchd:install
+PORT=1555 LOG_LEVEL=debug oaiproxy-launchd install
 ```
 
 To change the port after the agent is already installed, edit the plist directly and reload:
@@ -104,13 +104,13 @@ Do not kill the process with `kill` or `pkill` — `KeepAlive` is set, so launch
 You can also pin a specific Node binary if your shell uses a version manager:
 
 ```bash
-NODE_BINARY="$(command -v node)" npm run launchd:install
+NODE_BINARY="$(command -v node)" oaiproxy-launchd install
 ```
 
 If your reusable auth lives under a custom `CODEX_HOME`, pass that during install too:
 
 ```bash
-CODEX_HOME="/path/to/codex-home" npm run launchd:install
+CODEX_HOME="/path/to/codex-home" oaiproxy-launchd install
 ```
 
 ## Configuration

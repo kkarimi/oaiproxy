@@ -1,13 +1,28 @@
 {
-  "name": "oaiproxy",
+  "name": "@nima__/oai-proxy",
   "version": "0.1.0",
-  "private": true,
   "description": "Local ChatGPT subscription proxy exposing an OpenAI-compatible API.",
   "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "bin": {
+    "oaiproxy": "./dist/cli.js",
+    "oaiproxy-launchd": "./scripts/launch-agent.sh"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.11.0"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "start": "node --import tsx src/server.ts",
     "test": "node --import tsx --test src/*.test.ts src/**/*.test.ts",
     "typecheck": "tsc --noEmit",
