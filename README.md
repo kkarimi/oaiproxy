@@ -146,8 +146,12 @@ docker build -t oai-proxy:local .
 Run it locally:
 
 ```bash
-docker run --rm -p 1455:1455 oai-proxy:local
+docker run --rm -p 1455:1455 \
+  -v "$HOME/.chatgpt-codex:/home/node/.chatgpt-codex" \
+  oai-proxy:local
 ```
+
+The container healthcheck uses `/health`, not `/ready`, so a fresh container can stay running while you complete manual auth. Use `/ready` when you need to check whether auth is usable for chat completions.
 
 ## Configuration
 

@@ -31,18 +31,17 @@ export async function buildServer(
 
   app.get("/ready", async (_, reply) => {
     const authStatus = await services.auth.getStatus();
+    const responseBody = {
+      ok: authStatus.authenticated,
+      authenticated: authStatus.authenticated,
+      reason: authStatus.reason,
+    };
 
     if (!authStatus.authenticated) {
-      return reply.status(503).send({
-        ok: false,
-        auth: authStatus,
-      });
+      return reply.status(503).send(responseBody);
     }
 
-    return {
-      ok: true,
-      auth: authStatus,
-    };
+    return responseBody;
   });
 
   app.get("/v1/models", async () => {

@@ -217,8 +217,34 @@ test("ready route reports missing auth as unavailable", async (t) => {
   });
 
   assert.equal(response.statusCode, 503);
-  assert.equal(response.json().ok, false);
-  assert.equal(response.json().auth.authenticated, false);
+  assert.deepEqual(response.json(), {
+    ok: false,
+    authenticated: false,
+    reason: "missing",
+  });
+});
+
+test("ready route does not expose auth account metadata", async (t) => {
+  const app = await buildServer(
+    loadConfig({ ...process.env, LOG_LEVEL: "silent" }),
+    createAuthServiceStub(),
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/ready",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    ok: true,
+    authenticated: true,
+    reason: "ok",
+  });
 });
 
 test("auth login route starts browser login through the auth service", async (t) => {
